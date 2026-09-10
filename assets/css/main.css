@@ -303,7 +303,11 @@ button, input, select, textarea {
   border: none;
   cursor: pointer;
   color: #CBD5E1;
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
   transition: color 0.15s;
 }
 

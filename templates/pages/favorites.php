@@ -31,7 +31,7 @@ require __DIR__ . '/../header.php';
                 <div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <h1 style="font-size: 24px; font-weight: 800; color: #0F172A; margin: 0;">Favorite Logins</h1>
-                        <span style="font-size: 18px; color: #F59E0B;">★</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                     </div>
                     <p style="font-size: 14px; color: #64748B; margin-top: 2px;">Starred password entries for rapid access</p>
                 </div>
@@ -65,7 +65,9 @@ require __DIR__ . '/../header.php';
                             <?php if (empty($passwords)): ?>
                                 <tr>
                                     <td colspan="7" style="text-align: center; padding: 60px 20px; color: #94A3B8;">
-                                        <div style="font-size: 32px; color: #CBD5E1; margin-bottom: 8px;">★</div>
+                                        <div style="margin-bottom: 8px; color: #CBD5E1;">
+                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                        </div>
                                         <p style="font-size: 15px; font-weight: 600; color: #64748B;">No favorite items marked yet</p>
                                         <p style="font-size: 13px; margin-top: 4px;">Click the star icon next to any password in 'All Items' to add it to your favorites list.</p>
                                     </td>
@@ -74,7 +76,9 @@ require __DIR__ . '/../header.php';
                                 <?php foreach ($passwords as $p): ?>
                                     <tr id="item-row-<?= $p['id'] ?>" class="fav-row" data-search="<?= e(strtolower($p['app_name'] . ' ' . $p['username'] . ' ' . $p['login_url'])) ?>">
                                         <td style="text-align: center;">
-                                            <button type="button" class="star-btn active" onclick="toggleFavoriteItem(<?= $p['id'] ?>, this)" title="Unstar item">★</button>
+                                            <button type="button" class="star-btn active" onclick="toggleFavoriteItem(<?= $p['id'] ?>, this)" title="Unstar item" aria-label="Unstar item">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                            </button>
                                         </td>
                                         <td>
                                             <div style="display: flex; align-items: center; gap: 12px;">

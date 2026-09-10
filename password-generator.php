@@ -86,7 +86,10 @@ require __DIR__ . '/templates/header.php';
             <?php if (current_user()): ?>
                 <a href="<?= APP_URL ?>/dashboard" class="btn btn-secondary btn-sm">Go to Vault Dashboard</a>
             <?php else: ?>
-                <a href="<?= APP_URL ?>/login" style="font-size: 13px; color: var(--color-brand-red); text-decoration: none; font-weight: 600;">Sign in to save passwords in your vault →</a>
+                <a href="<?= APP_URL ?>/login" style="font-size: 13px; color: var(--color-brand-red); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                    Sign in to save passwords in your vault
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </a>
             <?php endif; ?>
         </div>
     </div>

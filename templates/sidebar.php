@@ -18,29 +18,6 @@ if ($currentUser) {
 }
 ?>
 <aside class="sidebar">
-    <div class="sidebar-add-btn" style="position: relative;">
-        <button type="button" class="btn btn-primary btn-full" onclick="toggleAddMenu(event)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>+ Add</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: auto;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </button>
-
-        <div id="add-menu-dropdown" style="display: none; position: absolute; left: 0; right: 0; top: 100%; margin-top: 6px; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.12); z-index: 60; overflow: hidden;">
-            <button type="button" onclick="openAddItemModal('password'); hideAddMenu();" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0F172A; cursor: pointer; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='none'">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Add Password Entry</span>
-            </button>
-            <div style="height: 1px; background: #F1F5F9;"></div>
-            <button type="button" onclick="openPasswordGenerator(); hideAddMenu();" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: #D32F2F; cursor: pointer; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span>Generate Password</span>
-            </button>
-        </div>
-    </div>
-
     <nav class="sidebar-nav">
         <a href="<?= APP_URL ?>/dashboard" class="sidebar-item <?= $view === 'dashboard' ? 'active' : '' ?>">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,22 +92,3 @@ if ($currentUser) {
     </nav>
 </aside>
 <div class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
-
-<script>
-function toggleAddMenu(e) {
-    e.stopPropagation();
-    const menu = document.getElementById('add-menu-dropdown');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    }
-}
-function hideAddMenu() {
-    const menu = document.getElementById('add-menu-dropdown');
-    if (menu) menu.style.display = 'none';
-}
-window.addEventListener('click', function(e) {
-    if (!e.target.closest('#add-menu-dropdown') && !e.target.closest('button[onclick*="toggleAddMenu"]')) {
-        hideAddMenu();
-    }
-});
-</script>

@@ -606,7 +606,7 @@ function updateTimelineUI() {
 
         if (i < currentStep) {
             stepEl.classList.add('completed');
-            stepEl.querySelector('.step-number').innerHTML = '✓';
+            stepEl.querySelector('.step-number').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
         } else if (i === currentStep) {
             stepEl.classList.add('active');
             stepEl.querySelector('.step-number').innerText = i;
@@ -717,13 +717,13 @@ async function nextStep() {
             const warnBox = document.getElementById('db-overwrite-warning');
 
             if (data.existing_tables) {
-                statusBox.innerHTML = `<div style="background: #FEF9C3; border: 1px solid #FDE047; padding: 14px; border-radius: 8px; font-size: 13px; color: #854D0E;">
-                    ✓ Database connection authenticated successfully. System detected <strong>${data.existing_count} existing tables</strong>.
+                statusBox.innerHTML = `<div style="background: #FEF9C3; border: 1px solid #FDE047; padding: 14px; border-radius: 8px; font-size: 13px; color: #854D0E; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Database connection authenticated successfully. System detected <strong>${data.existing_count} existing tables</strong>.
                 </div>`;
                 warnBox.style.display = 'block';
             } else {
-                statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46;">
-                    ✓ Database connection authenticated successfully. Target database is clean and ready.
+                statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Database connection authenticated successfully. Target database is clean and ready.
                 </div>`;
                 warnBox.style.display = 'none';
             }
@@ -830,8 +830,8 @@ async function nextStep() {
             }
 
             if (!res.ok || !data.success) {
-                statusBox.innerHTML = `<div style="background: #FEE2E2; border: 1px solid #FCA5A5; padding: 14px; border-radius: 8px; font-size: 13px; color: #991B1B;">
-                    ✕ ${escapeHtml(data.error || 'SMTP Test Failed')}
+                statusBox.innerHTML = `<div style="background: #FEE2E2; border: 1px solid #FCA5A5; padding: 14px; border-radius: 8px; font-size: 13px; color: #991B1B; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> ${escapeHtml(data.error || 'SMTP Test Failed')}
                 </div>`;
                 toast.error(data.error || 'SMTP Connection Test Failed');
                 nextBtn.disabled = false;
@@ -839,8 +839,8 @@ async function nextStep() {
                 return;
             }
 
-            statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46;">
-                ✓ SMTP server authentication test passed successfully!
+            statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46; display: flex; align-items: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> SMTP server authentication test passed successfully!
             </div>`;
             toast.success('SMTP Server Authentication Passed!');
 
@@ -920,8 +920,8 @@ async function skipSMTPSetup() {
             toast.info('SMTP Configuration skipped. Email delivery will remain disabled.');
             const statusBox = document.getElementById('smtp-test-status');
             if (statusBox) {
-                statusBox.innerHTML = `<div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 14px; border-radius: 8px; font-size: 13px; color: #1E40AF;">
-                    ℹ SMTP setup skipped. Email functionality will remain disabled until configured in Security Settings.
+                statusBox.innerHTML = `<div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 14px; border-radius: 8px; font-size: 13px; color: #1E40AF; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> SMTP setup skipped. Email functionality will remain disabled until configured in Security Settings.
                 </div>`;
             }
             currentStep = 6;

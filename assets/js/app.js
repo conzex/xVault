@@ -24,7 +24,7 @@ window.toast = {
         toast.className = `toast ${type}`;
         toast.innerHTML = `
             <span>${escapeHtml(message)}</span>
-            <button type="button" class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+            <button type="button" class="toast-close" onclick="this.parentElement.remove()" aria-label="Close notification"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         `;
         
         // Stack newest on top
@@ -263,8 +263,8 @@ window.CustomModal = {
             backdrop.innerHTML = `
                 <div class="modal" style="max-width: 440px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${isDanger ? '#FEF2F2' : '#EFF6FF'}; color: ${isDanger ? '#DC2626' : '#2563EB'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; font-weight: bold;">
-                            ${isDanger ? '⚠️' : 'ℹ️'}
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${isDanger ? '#FEF2F2' : '#EFF6FF'}; color: ${isDanger ? '#DC2626' : '#2563EB'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            ${isDanger ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'}
                         </div>
                         <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0F172A;">${escapeHtml(title)}</h3>
                     </div>
@@ -434,7 +434,7 @@ window.openShareItemModal = function(entryId, appName) {
             <div class="modal" style="max-width: 480px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
                     <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0F172A;" id="share-modal-title">Share Credential</h3>
-                    <button type="button" class="toast-close" onclick="closeModal('share-item-modal')" style="font-size: 20px;">&times;</button>
+                    <button type="button" class="toast-close" onclick="closeModal('share-item-modal')" aria-label="Close modal" style="display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                 </div>
                 <input type="hidden" id="share-modal-entry-id" value="" />
                 
@@ -473,7 +473,7 @@ window.openShareItemModal = function(entryId, appName) {
                 </div>
 
                 <div id="share-modal-result-view" style="display: none; text-align: center; padding-top: 10px;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #DCFCE7; color: #16A34A; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 12px;">✓</div>
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #DCFCE7; color: #16A34A; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
                     <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 6px 0;">Share Link Ready</h4>
                     <p style="font-size: 13px; color: #64748B; margin-bottom: 16px;">Anyone with this link can view only this specific credential before expiry.</p>
                     

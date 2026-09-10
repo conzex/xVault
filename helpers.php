@@ -55,6 +55,52 @@ if (!defined('APP_URL')) {
 
 require_once __DIR__ . '/config.php';
 
+/**
+ * Dynamic System Settings Engine
+ * Retrieves settings from database system_settings table with runtime memory caching
+ */
+function get_system_setting($key, $default = null) {
+    static $cache = null;
+
+    if ($cache === null) {
+        $cache = [];
+        try {
+            $db = getDB();
+            $stmt = $db->query("SELECT setting_key, setting_value FROM system_settings");
+            if ($stmt) {
+                $cache = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            }
+        } catch (\Throwable $e) {
+            $cache = [];
+        }
+    }
+
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    return $default;
+}
+
+/**
+ * Set or Update System Setting in Database
+ */
+function set_system_setting($key, $value) {
+    try {
+        $db = getDB();
+        if (defined('DB_DRIVER') && DB_DRIVER === 'sqlite') {
+            $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
+        } else {
+            $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        }
+        return $stmt->execute([$key, (string)$value]);
+    } catch (\Throwable $e) {
+        error_log("set_system_setting error: " . $e->getMessage());
+        return false;
+    }
+}
+
+
 
 /**
  * Initialize secure PHP session
@@ -280,7 +326,7 @@ function render_email_template($title, $bodyHtml, $ctaUrl = null, $ctaText = nul
     if (!empty($securityNote)) {
         $securityBoxHtml = '
         <div style="background-color: #FEF2F2; border-left: 4px solid #D32F2F; border-radius: 6px; padding: 14px 18px; margin: 24px 0;">
-            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #991B1B;">🔒 Security Notice</p>
+            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #991B1B;">Security Notice</p>
             <p style="margin: 4px 0 0 0; font-size: 12px; color: #7F1D1D; line-height: 1.5;">' . e($securityNote) . '</p>
         </div>';
     }
@@ -305,7 +351,6 @@ function render_email_template($title, $bodyHtml, $ctaUrl = null, $ctaText = nul
                                 <tr>
                                     <td align="left">
                                         <div style="font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px;">
-                                            <span style="display: inline-block; width: 28px; height: 28px; background: #D32F2F; border-radius: 6px; text-align: center; line-height: 28px; color: #ffffff; font-size: 16px; margin-right: 8px;">🔒</span>
                                             <span style="color: #D32F2F;">x</span>Vault
                                         </div>
                                     </td>

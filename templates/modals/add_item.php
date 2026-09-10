@@ -15,7 +15,9 @@ if ($currentUser) {
     <div class="modal-content" style="max-width: 580px;">
         <div class="modal-header">
             <h3 class="modal-title" id="add-item-modal-title">Add Vault Item</h3>
-            <button type="button" class="modal-close" data-close-modal>&times;</button>
+            <button type="button" class="modal-close" data-close-modal aria-label="Close modal">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
         </div>
 
         <!-- Item Type Tabs -->

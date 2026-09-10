@@ -114,7 +114,7 @@ class ShareController {
                     "<strong>Expiration:</strong> {$expiresInText}<br/>" .
                     "<strong>Access Rule:</strong> " . ($oneTime ? 'One-time view only' : 'Time-restricted link') . "</p>" .
                     "<p>Click below to securely view this record.</p>";
-            $sent = send_user_transactional_email($email, '🔒 Shared Credential Access Link', 'Secure Credential Share', $body, $shareUrl, 'View Shared Credential', 'This link grants access ONLY to the single specified credential record.');
+            $sent = send_user_transactional_email($email, 'Shared Credential Access Link', 'Secure Credential Share', $body, $shareUrl, 'View Shared Credential', 'This link grants access ONLY to the single specified credential record.');
         }
 
         json_response([

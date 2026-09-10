@@ -31,7 +31,7 @@ require __DIR__ . '/../header.php';
         <?php if ($status === 'success'): ?>
             <div style="background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; padding: 20px; border-radius: 10px; margin-bottom: 24px; text-align: left;">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <div style="width: 28px; height: 28px; background: #10B981; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">✓</div>
+                    <div style="width: 28px; height: 28px; background: #10B981; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
                     <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #065F46;">Email Verified</h3>
                 </div>
                 <p style="margin: 0; font-size: 14px; line-height: 1.5;"><?= e($message) ?></p>
@@ -41,7 +41,7 @@ require __DIR__ . '/../header.php';
         <?php elseif ($status === 'already_verified'): ?>
             <div style="background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; padding: 20px; border-radius: 10px; margin-bottom: 24px; text-align: left;">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <div style="width: 28px; height: 28px; background: #3B82F6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">ℹ</div>
+                    <div style="width: 28px; height: 28px; background: #3B82F6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
                     <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #1E40AF;">Account Already Verified</h3>
                 </div>
                 <p style="margin: 0; font-size: 14px; line-height: 1.5;"><?= e($message) ?></p>
@@ -51,7 +51,7 @@ require __DIR__ . '/../header.php';
         <?php elseif ($status === 'expired'): ?>
             <div style="background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; padding: 20px; border-radius: 10px; margin-bottom: 24px; text-align: left;">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <div style="width: 28px; height: 28px; background: #F59E0B; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">⏰</div>
+                    <div style="width: 28px; height: 28px; background: #F59E0B; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
                     <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #92400E;">Verification Link Expired</h3>
                 </div>
                 <p style="margin: 0; font-size: 14px; line-height: 1.5;"><?= e($message) ?></p>
@@ -71,7 +71,7 @@ require __DIR__ . '/../header.php';
         <?php else: ?>
             <div style="background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 20px; border-radius: 10px; margin-bottom: 24px; text-align: left;">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <div style="width: 28px; height: 28px; background: #EF4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">✕</div>
+                    <div style="width: 28px; height: 28px; background: #EF4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
                     <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #991B1B;">Invalid Verification Link</h3>
                 </div>
                 <p style="margin: 0; font-size: 14px; line-height: 1.5;"><?= e($message) ?></p>

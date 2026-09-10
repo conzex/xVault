@@ -30,7 +30,7 @@ require __DIR__ . '/../header.php';
         <!-- UNVERIFIED NOTICE BANNER -->
         <div id="unverified-banner" style="display: none; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: left;">
             <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span>⚠️</span> Email Verification Required
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Email Verification Required
             </div>
             <p id="unverified-banner-msg" style="margin: 0 0 10px 0; color: #78350F; line-height: 1.4;">Please verify your email address before logging in.</p>
             <button type="button" id="btn-login-resend" onclick="resendFromLoginBanner()" class="btn btn-secondary btn-full" style="padding: 8px 14px; font-size: 13px; font-weight: 600; border-color: #F59E0B; color: #92400E; background: #FEF3C7;">Resend Verification Email</button>
