@@ -211,7 +211,7 @@ async function decryptAndShowPassword(itemId, textElementId) {
     }
 
     try {
-        const res = await fetch(`/api/vault/decrypt/${itemId}`);
+        const res = await fetch(`${window.APP_URL || ''}/api/vault/decrypt/${itemId}`);
         const data = await res.json();
         if (data.success && data.password) {
             el.textContent = data.password;
@@ -227,7 +227,7 @@ async function decryptAndShowPassword(itemId, textElementId) {
 /* Toggle Favorite AJAX handler */
 async function toggleFavoriteItem(itemId, btnElement) {
     try {
-        const res = await fetch(`/api/vault/favorite/${itemId}`, {
+        const res = await fetch(`${window.APP_URL || ''}/api/vault/favorite/${itemId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -348,7 +348,7 @@ async function deleteVaultItem(itemId, itemType = 'vault') {
     if (!confirmed) return;
 
     try {
-        const res = await fetch(`/api/${itemType}/${itemId}`, {
+        const res = await fetch(`${window.APP_URL || ''}/api/${itemType}/${itemId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -378,8 +378,8 @@ function initSecurityPolling() {
 async function fetchSecurityDashboardData() {
     try {
         const [statsRes, logsRes] = await Promise.all([
-            fetch('/api/security/stats'),
-            fetch('/api/security/logs')
+            fetch(`${window.APP_URL || ''}/api/security/stats`),
+            fetch(`${window.APP_URL || ''}/api/security/logs`)
         ]);
 
         if (statsRes.ok) {
@@ -390,7 +390,10 @@ async function fetchSecurityDashboardData() {
             const totalEl = document.getElementById('sec-total-val');
             const updatedEl = document.getElementById('sec-last-updated');
 
-            if (scoreEl) scoreEl.textContent = stats.score + '%';
+            if (scoreEl) {
+                scoreEl.textContent = stats.has_data ? (stats.score + '%') : (stats.score_text || 'N/A');
+                scoreEl.style.fontSize = stats.has_data ? '36px' : '22px';
+            }
             if (weakEl) weakEl.textContent = stats.weak_passwords;
             if (reusedEl) reusedEl.textContent = stats.reused_passwords;
             if (totalEl) totalEl.textContent = stats.total_passwords;
@@ -506,7 +509,7 @@ window.submitShareItemModal = async function() {
     btn.textContent = 'Generating...';
 
     try {
-        const res = await fetch('/api/share/generate', {
+        const res = await fetch(`${window.APP_URL || ''}/api/share/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
