@@ -23,11 +23,11 @@ require __DIR__ . '/../header.php';
                     <form id="form-update-profile" onsubmit="handleUpdateProfile(event)">
                         <div class="form-group">
                             <label class="form-label">Full Name</label>
-                            <input type="text" name="name" value="<?= e($user['name']) ?>" class="form-control" required>
+                            <input type="text" name="name" value="<?= e($user['name']) ?>" placeholder="e.g. Alex Morgan" class="form-control" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Email Address</label>
-                            <input type="email" name="email" value="<?= e($user['email']) ?>" class="form-control" required>
+                            <input type="email" name="email" value="<?= e($user['email']) ?>" placeholder="e.g. user@domain.com" class="form-control" required>
                         </div>
                         <button type="submit" class="btn btn-primary" style="margin-top: 8px;">Update Profile</button>
                     </form>
@@ -39,15 +39,16 @@ require __DIR__ . '/../header.php';
                     <form id="form-change-password" onsubmit="handleChangePassword(event)">
                         <div class="form-group">
                             <label class="form-label">Current Master Password</label>
-                            <input type="password" name="currentPassword" class="form-control" required>
+                            <input type="password" name="currentPassword" placeholder="Enter current master password" class="form-control" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">New Master Password</label>
-                            <input type="password" name="newPassword" class="form-control" minlength="6" required>
+                            <input type="password" name="newPassword" placeholder="Enter new master password (min 6 chars)" class="form-control" minlength="6" required>
                         </div>
                         <button type="submit" class="btn btn-primary" style="margin-top: 8px;">Update Master Password</button>
                     </form>
                 </div>
+
             </div>
         </div>
     </main>

@@ -408,19 +408,19 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="form-grid">
                 <div>
                     <label>Database Host</label>
-                    <input type="text" id="db_host" value="127.0.0.1" placeholder="127.0.0.1 or localhost">
+                    <input type="text" id="db_host" placeholder="e.g. 127.0.0.1 or localhost">
                 </div>
                 <div>
                     <label>Database Port</label>
-                    <input type="number" id="db_port" value="3306" placeholder="3306">
+                    <input type="number" id="db_port" placeholder="e.g. 3306">
                 </div>
                 <div>
                     <label>Database Name</label>
-                    <input type="text" id="db_name" value="xvault_db" placeholder="xvault_db">
+                    <input type="text" id="db_name" placeholder="e.g. xvault_db">
                 </div>
                 <div>
                     <label>Database Username</label>
-                    <input type="text" id="db_user" value="root" placeholder="root">
+                    <input type="text" id="db_user" placeholder="e.g. xvault_user or root">
                 </div>
                 <div class="form-group-full">
                     <label>Database Password</label>
@@ -465,27 +465,27 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="form-grid">
                 <div>
                     <label>Admin Username</label>
-                    <input type="text" id="admin_username" value="admin" placeholder="admin">
+                    <input type="text" id="admin_username" placeholder="e.g. admin">
                 </div>
                 <div>
                     <label>Email Address</label>
-                    <input type="email" id="admin_email" value="admin@example.com" placeholder="admin@domain.com">
+                    <input type="email" id="admin_email" placeholder="e.g. admin@yourdomain.com">
                 </div>
                 <div>
                     <label>First Name</label>
-                    <input type="text" id="admin_first_name" value="Super" placeholder="First Name">
+                    <input type="text" id="admin_first_name" placeholder="e.g. System">
                 </div>
                 <div>
                     <label>Last Name</label>
-                    <input type="text" id="admin_last_name" value="Admin" placeholder="Last Name">
+                    <input type="text" id="admin_last_name" placeholder="e.g. Administrator">
                 </div>
                 <div>
                     <label>Master Password</label>
-                    <input type="password" id="admin_password" placeholder="Minimum 8 characters">
+                    <input type="password" id="admin_password" placeholder="Enter strong master password (min 8 chars)">
                 </div>
                 <div>
                     <label>Confirm Master Password</label>
-                    <input type="password" id="admin_password_confirm" placeholder="Re-enter password">
+                    <input type="password" id="admin_password_confirm" placeholder="Re-enter password to confirm">
                 </div>
             </div>
         </div>
@@ -498,11 +498,11 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="form-grid">
                 <div>
                     <label>SMTP Host</label>
-                    <input type="text" id="smtp_host" value="mail.example.com" placeholder="mail.yourdomain.com">
+                    <input type="text" id="smtp_host" placeholder="e.g. mail.yourdomain.com">
                 </div>
                 <div>
                     <label>SMTP Port</label>
-                    <input type="number" id="smtp_port" value="587" placeholder="465 or 587">
+                    <input type="number" id="smtp_port" placeholder="e.g. 587 or 465">
                 </div>
                 <div>
                     <label>Encryption Security</label>
@@ -514,22 +514,23 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 </div>
                 <div>
                     <label>SMTP Username</label>
-                    <input type="text" id="smtp_user" value="smtp@example.com" placeholder="user@domain.com">
+                    <input type="text" id="smtp_user" placeholder="e.g. user@yourdomain.com">
                 </div>
                 <div>
                     <label>SMTP Password</label>
-                    <input type="password" id="smtp_pass" placeholder="SMTP Password">
+                    <input type="password" id="smtp_pass" placeholder="Enter SMTP password">
                 </div>
                 <div>
                     <label>From Name</label>
-                    <input type="text" id="smtp_from_name" value="xVault Security" placeholder="xVault Security">
+                    <input type="text" id="smtp_from_name" placeholder="e.g. xVault Security">
                 </div>
                 <div class="form-group-full">
                     <label>From Email Address</label>
-                    <input type="email" id="smtp_from_email" value="vault@example.com" placeholder="vault@yourdomain.com">
+                    <input type="email" id="smtp_from_email" placeholder="e.g. vault@yourdomain.com">
                 </div>
             </div>
         </div>
+
 
 
         <!-- Step 6: SMTP Authentication/Test -->
@@ -676,12 +677,13 @@ async function nextStep() {
 
         const payload = {
             db_driver: 'mysql',
-            db_host: document.getElementById('db_host').value.trim(),
-            db_port: document.getElementById('db_port').value.trim(),
-            db_name: document.getElementById('db_name').value.trim(),
-            db_user: document.getElementById('db_user').value.trim(),
+            db_host: document.getElementById('db_host').value.trim() || '127.0.0.1',
+            db_port: document.getElementById('db_port').value.trim() || '3306',
+            db_name: document.getElementById('db_name').value.trim() || 'xvault_db',
+            db_user: document.getElementById('db_user').value.trim() || 'root',
             db_pass: document.getElementById('db_pass').value
         };
+
 
         try {
             const res = await fetch('/api/install/test-db', {
@@ -783,14 +785,15 @@ async function nextStep() {
         nextBtn.innerText = 'Testing SMTP Connection...';
 
         const payload = {
-            smtp_host: document.getElementById('smtp_host').value.trim(),
-            smtp_port: document.getElementById('smtp_port').value.trim(),
+            smtp_host: document.getElementById('smtp_host').value.trim() || 'localhost',
+            smtp_port: document.getElementById('smtp_port').value.trim() || '587',
             smtp_enc: document.getElementById('smtp_enc').value,
             smtp_user: document.getElementById('smtp_user').value.trim(),
             smtp_pass: document.getElementById('smtp_pass').value,
-            smtp_from_email: document.getElementById('smtp_from_email').value.trim(),
-            smtp_from_name: document.getElementById('smtp_from_name').value.trim()
+            smtp_from_email: document.getElementById('smtp_from_email').value.trim() || 'vault@example.com',
+            smtp_from_name: document.getElementById('smtp_from_name').value.trim() || 'xVault Security'
         };
+
 
         try {
             const res = await fetch('/api/install/test-smtp', {

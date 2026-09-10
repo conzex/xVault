@@ -45,8 +45,9 @@ require __DIR__ . '/../header.php';
                 <input type="hidden" name="token" value="<?= e($token) ?>">
                 <div class="form-group">
                     <label class="form-label">New Master Password</label>
-                    <input type="password" name="password" class="form-control" minlength="6" placeholder="••••••••" required>
+                    <input type="password" name="password" class="form-control" minlength="6" placeholder="Enter new master password" required>
                 </div>
+
                 <button type="submit" class="btn btn-primary btn-full" style="padding: 12px; margin-top: 8px;">Update Master Password</button>
             </form>
         <?php endif; ?>

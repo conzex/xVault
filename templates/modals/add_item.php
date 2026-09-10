@@ -72,35 +72,35 @@ if ($currentUser) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">First Name</label>
-                        <input type="text" name="first_name" class="form-control">
+                        <input type="text" name="first_name" class="form-control" placeholder="e.g. Alex">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Last Name</label>
-                        <input type="text" name="last_name" class="form-control">
+                        <input type="text" name="last_name" class="form-control" placeholder="e.g. Morgan">
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Address Line 1</label>
-                    <input type="text" name="address_line1" class="form-control">
+                    <input type="text" name="address_line1" class="form-control" placeholder="e.g. 100 Enterprise Way">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">City</label>
-                        <input type="text" name="city" class="form-control">
+                        <input type="text" name="city" class="form-control" placeholder="e.g. San Francisco">
                     </div>
                     <div class="form-group">
                         <label class="form-label">State / Province</label>
-                        <input type="text" name="state" class="form-control">
+                        <input type="text" name="state" class="form-control" placeholder="e.g. California">
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">Zip / Postal Code</label>
-                        <input type="text" name="zip_code" class="form-control">
+                        <input type="text" name="zip_code" class="form-control" placeholder="e.g. 94107">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Country</label>
-                        <input type="text" name="country" class="form-control">
+                        <input type="text" name="country" class="form-control" placeholder="e.g. United States">
                     </div>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
@@ -140,12 +140,13 @@ if ($currentUser) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Customer / Client Name</label>
-                    <input type="text" name="customer_name" class="form-control" placeholder="Acme Corp">
+                    <input type="text" name="customer_name" class="form-control" placeholder="e.g. Acme Corp">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Customer Contact Email</label>
-                    <input type="email" name="customer_email" class="form-control" placeholder="client@acme.com">
+                    <input type="email" name="customer_email" class="form-control" placeholder="e.g. client@acme.com">
                 </div>
+
                 <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
                     <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Folder</button>

@@ -29,7 +29,7 @@ require __DIR__ . '/../header.php';
                     <form id="form-share-generate" onsubmit="handleGenerateShareLink(event)">
                         <div class="form-group">
                             <label class="form-label">Customer / Client Email *</label>
-                            <input type="email" name="email" id="share-email" class="form-control" placeholder="customer@example.com" required>
+                            <input type="email" name="email" id="share-email" class="form-control" placeholder="e.g. client@domain.com" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Link Expiration</label>
@@ -43,8 +43,9 @@ require __DIR__ . '/../header.php';
                         </div>
                         <div class="form-group" id="group-custom-hours" style="display: none;">
                             <label class="form-label">Custom Hours</label>
-                            <input type="number" name="customHours" min="1" max="8760" value="12" class="form-control">
+                            <input type="number" name="customHours" min="1" max="8760" placeholder="e.g. 12" class="form-control">
                         </div>
+
                         <div class="form-group">
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer;">
                                 <input type="checkbox" name="oneTime" value="1" style="accent-color: var(--color-brand-red);">

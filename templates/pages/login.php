@@ -30,14 +30,14 @@ require __DIR__ . '/../header.php';
         <form id="form-login" onsubmit="handleLoginSubmit(event)">
             <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input type="email" name="email" id="login-email" class="form-control" placeholder="user@company.com" required>
+                <input type="email" name="email" id="login-email" class="form-control" placeholder="e.g. user@domain.com" required>
             </div>
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                     <label class="form-label" style="margin-bottom: 0;">Master Password</label>
                     <button type="button" onclick="showForgotPassword()" style="background: none; border: none; font-size: 12px; color: var(--color-brand-red); cursor: pointer;">Forgot?</button>
                 </div>
-                <input type="password" name="password" id="login-password" class="form-control" required>
+                <input type="password" name="password" id="login-password" class="form-control" placeholder="Enter master password" required>
             </div>
             <button type="submit" class="btn btn-primary btn-full" style="padding: 12px; font-size: 15px; margin-top: 8px;">Log In</button>
         </form>
@@ -46,15 +46,15 @@ require __DIR__ . '/../header.php';
         <form id="form-register" onsubmit="handleRegisterSubmit(event)" style="display: none;">
             <div class="form-group">
                 <label class="form-label">Full Name *</label>
-                <input type="text" name="name" class="form-control" placeholder="John Doe" required>
+                <input type="text" name="name" class="form-control" placeholder="e.g. Alex Morgan" required>
             </div>
             <div class="form-group">
                 <label class="form-label">Email Address *</label>
-                <input type="email" name="email" class="form-control" placeholder="user@company.com" required>
+                <input type="email" name="email" class="form-control" placeholder="e.g. user@domain.com" required>
             </div>
             <div class="form-group">
                 <label class="form-label">Master Password *</label>
-                <input type="password" name="password" class="form-control" placeholder="••••••••" minlength="6" required>
+                <input type="password" name="password" class="form-control" placeholder="Enter master password (min 6 chars)" minlength="6" required>
             </div>
             <button type="submit" class="btn btn-primary btn-full" style="padding: 12px; font-size: 15px; margin-top: 8px;">Create Account</button>
         </form>
@@ -64,11 +64,12 @@ require __DIR__ . '/../header.php';
             <p style="font-size: 13px; color: #475569; margin-bottom: 16px;">Enter your account email to receive a password reset link.</p>
             <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-control" required>
+                <input type="email" name="email" class="form-control" placeholder="e.g. user@domain.com" required>
             </div>
             <button type="submit" class="btn btn-primary btn-full" style="padding: 12px; font-size: 15px; margin-top: 8px;">Send Reset Link</button>
             <button type="button" onclick="switchAuthMode('login')" class="btn btn-secondary btn-full" style="padding: 10px; margin-top: 10px;">Back to Login</button>
         </form>
+
     </div>
 </div>
 
