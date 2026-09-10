@@ -80,3 +80,14 @@ CREATE TABLE IF NOT EXISTS shared_links (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS security_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    ip_address VARCHAR(50) NULL,
+    user_agent VARCHAR(255) NULL,
+    details TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

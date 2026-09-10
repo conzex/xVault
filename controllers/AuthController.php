@@ -26,6 +26,9 @@ class AuthController {
             case 'logout':
                 self::logout();
                 break;
+            case 'lock':
+                self::lock();
+                break;
             case 'verify-email':
                 self::verifyEmail();
                 break;
@@ -67,10 +70,12 @@ class AuthController {
         $user = $stmt->fetch();
 
         if (!$user || !verify_master_password($password, $user['password_hash'])) {
+            log_security_event('LOGIN_FAILED', "Failed login attempt for email: {$email}", $user['id'] ?? null);
             json_response(['error' => 'Invalid email or password'], 401);
         }
 
         if ($user['role'] !== 'admin' && empty($user['is_verified'])) {
+            log_security_event('LOGIN_FAILED', "Unverified account login attempt: {$email}", $user['id']);
             json_response(['error' => 'Please verify your email address before logging in', 'unverified' => true], 403);
         }
 
@@ -84,6 +89,8 @@ class AuthController {
             'role' => $user['role']
         ];
         $_SESSION['user'] = $sessionUser;
+
+        log_security_event('LOGIN_SUCCESS', "User logged in successfully", $user['id']);
 
         json_response([
             'success' => true,
@@ -125,7 +132,6 @@ class AuthController {
         $passwordHash = hash_master_password($password);
         $verificationToken = bin2hex(random_bytes(32));
 
-        // First registered user becomes admin if table is empty
         $countStmt = $db->query('SELECT COUNT(*) as cnt FROM users');
         $userCount = (int)$countStmt->fetch()['cnt'];
         $role = ($userCount === 0) ? 'admin' : 'user';
@@ -134,6 +140,8 @@ class AuthController {
         $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, is_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?)');
         $insert->execute([$email, $passwordHash, $role, $name, $isVerified, $verificationToken]);
         $userId = $db->lastInsertId();
+
+        log_security_event('USER_REGISTERED', "New account created: {$email} ({$role})", $userId);
 
         if (!$isVerified) {
             $verifyLink = APP_URL . '/verify-email?token=' . $verificationToken;
@@ -148,6 +156,10 @@ class AuthController {
     }
 
     public static function logout() {
+        $user = current_user();
+        if ($user) {
+            log_security_event('LOGOUT', 'User logged out', $user['id']);
+        }
         init_session();
         $_SESSION = [];
         if (ini_get("session.use_cookies")) {
@@ -161,6 +173,17 @@ class AuthController {
         json_response(['success' => true]);
     }
 
+    public static function lock() {
+        $user = current_user();
+        if ($user) {
+            log_security_event('VAULT_LOCKED', 'Vault manually locked by user', $user['id']);
+        }
+        init_session();
+        $_SESSION = [];
+        session_destroy();
+        json_response(['success' => true, 'message' => 'Vault locked']);
+    }
+
     public static function verifyEmail() {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_REQUEST;
         $token = trim($input['token'] ?? '');
@@ -170,7 +193,7 @@ class AuthController {
         }
 
         $db = getDB();
-        $stmt = $db->prepare('SELECT id FROM users WHERE verification_token = ?');
+        $stmt = $db->prepare('SELECT id, email FROM users WHERE verification_token = ?');
         $stmt->execute([$token]);
         $user = $stmt->fetch();
 
@@ -180,6 +203,8 @@ class AuthController {
 
         $update = $db->prepare('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = ?');
         $update->execute([$user['id']]);
+
+        log_security_event('EMAIL_VERIFIED', "Email verified for {$user['email']}", $user['id']);
 
         json_response(['success' => true, 'message' => 'Email verified successfully! You can now log in.']);
     }
@@ -231,6 +256,8 @@ class AuthController {
         $html = "<h2>Password Reset Request</h2><p>Click the link to reset your xVault password (expires in 1 hour): <a href='{$resetLink}'>{$resetLink}</a></p>";
         send_app_email($email, 'Password Reset Request', $html);
 
+        log_security_event('PASSWORD_RESET_REQUEST', "Password reset link requested for {$email}", $user['id']);
+
         json_response(['success' => true, 'message' => 'Password reset email sent']);
     }
 
@@ -260,6 +287,8 @@ class AuthController {
         $update = $db->prepare('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?');
         $update->execute([$passwordHash, $user['id']]);
 
+        log_security_event('PASSWORD_RESET_SUCCESS', 'Master password reset via email link', $user['id']);
+
         json_response(['success' => true, 'message' => 'Password reset successfully. You can now log in with your new password.']);
     }
 
@@ -288,12 +317,15 @@ class AuthController {
             $_SESSION['user']['name'] = $name;
             $_SESSION['user']['email'] = $email;
 
+            log_security_event('PROFILE_UPDATED', "Updated email to {$email}", $user['id']);
+
             json_response(['success' => true, 'message' => 'Profile updated. Please verify your new email address.', 'reverify' => true]);
         } else {
             $up = $db->prepare('UPDATE users SET name = ? WHERE id = ?');
             $up->execute([$name, $user['id']]);
 
             $_SESSION['user']['name'] = $name;
+            log_security_event('PROFILE_UPDATED', "Updated profile name to {$name}", $user['id']);
             json_response(['success' => true, 'message' => 'Profile updated successfully']);
         }
     }
@@ -314,6 +346,7 @@ class AuthController {
         $row = $stmt->fetch();
 
         if (!$row || !verify_master_password($currentPassword, $row['password_hash'])) {
+            log_security_event('PASSWORD_CHANGE_FAILED', 'Incorrect current master password attempt', $user['id']);
             json_response(['error' => 'Incorrect current master password'], 401);
         }
 
@@ -324,6 +357,8 @@ class AuthController {
         $newHash = hash_master_password($newPassword);
         $up = $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
         $up->execute([$newHash, $user['id']]);
+
+        log_security_event('PASSWORD_CHANGED', 'Master password changed successfully', $user['id']);
 
         json_response(['success' => true, 'message' => 'Master password updated successfully']);
     }

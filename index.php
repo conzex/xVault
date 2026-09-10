@@ -17,6 +17,7 @@ require_once __DIR__ . '/controllers/FolderController.php';
 require_once __DIR__ . '/controllers/AddressController.php';
 require_once __DIR__ . '/controllers/NoteController.php';
 require_once __DIR__ . '/controllers/ShareController.php';
+require_once __DIR__ . '/controllers/SecurityController.php';
 
 // Start or resume session
 init_session();
@@ -43,7 +44,6 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // CSRF Validation for POST/PUT/DELETE API endpoints
 if (in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH']) && strpos($path, '/api/') === 0) {
-    // Skip CSRF check for public auth actions
     $unprotected = ['/api/auth/login', '/api/auth/register', '/api/auth/verify-email', '/api/auth/resend-verification', '/api/auth/forgot-password', '/api/auth/reset-password'];
     if (!in_array($path, $unprotected)) {
         $headers = getallheaders();
@@ -51,10 +51,6 @@ if (in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH']) && strpos($path, '/api
         if (!$token) {
             $input = json_decode(file_get_contents('php://input') ?: '{}', true);
             $token = $input['csrf_token'] ?? null;
-        }
-        // Validate CSRF if session has token
-        if (!empty($_SESSION['csrf_token']) && !verify_csrf_token($token)) {
-            // Log notice and continue if session was just established, or enforce if token sent
         }
     }
 }
@@ -67,6 +63,14 @@ if (strpos($path, '/api/') === 0) {
     // Auth APIs
     if (preg_match('#^/api/auth/([a-z\-]+)$#', $path, $m)) {
         AuthController::handleRequest($m[1]);
+    }
+
+    // Security APIs
+    elseif ($path === '/api/security/stats') {
+        SecurityController::handleRequest('stats');
+    }
+    elseif ($path === '/api/security/logs') {
+        SecurityController::handleRequest('logs');
     }
 
     // Vault Passwords APIs

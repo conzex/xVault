@@ -231,3 +231,30 @@ function send_app_email($toEmail, $subject, $htmlBody) {
     }
     return $sent;
 }
+
+/**
+ * Log Security Event in Database Audit Log
+ */
+function log_security_event($eventType, $details = null, $userId = null) {
+    try {
+        if ($userId === null) {
+            $user = current_user();
+            $userId = $user['id'] ?? null;
+        }
+
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        if (strpos($ip, ',') !== false) {
+            $ip = trim(explode(',', $ip)[0]);
+        }
+        $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown', 0, 250);
+
+        $db = getDB();
+        $stmt = $db->prepare('
+            INSERT INTO security_logs (user_id, event_type, ip_address, user_agent, details)
+            VALUES (?, ?, ?, ?, ?)
+        ');
+        $stmt->execute([$userId, $eventType, $ip, $ua, $details]);
+    } catch (\Throwable $e) {
+        error_log("Security log write exception: " . $e->getMessage());
+    }
+}

@@ -90,10 +90,13 @@ class VaultController {
             VALUES (?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([$userId, $folderId, $appName, $loginUrl, $username, $encryptedPassword]);
+        $newId = (int)$db->lastInsertId();
+
+        log_security_event('CREDENTIAL_CREATE', "Added vault entry: {$appName} ({$username})", $userId);
 
         json_response([
             'success' => true,
-            'id' => (int)$db->lastInsertId(),
+            'id' => $newId,
             'message' => 'Password entry saved'
         ], 201);
     }
@@ -104,7 +107,7 @@ class VaultController {
         }
 
         $db = getDB();
-        $stmt = $db->prepare('SELECT id, is_favorite FROM password_entries WHERE id = ? AND user_id = ?');
+        $stmt = $db->prepare('SELECT id, is_favorite, app_name FROM password_entries WHERE id = ? AND user_id = ?');
         $stmt->execute([(int)$id, $userId]);
         $entry = $stmt->fetch();
 
@@ -125,7 +128,7 @@ class VaultController {
         }
 
         $db = getDB();
-        $stmt = $db->prepare('SELECT encrypted_password FROM password_entries WHERE id = ? AND user_id = ?');
+        $stmt = $db->prepare('SELECT app_name, encrypted_password FROM password_entries WHERE id = ? AND user_id = ?');
         $stmt->execute([(int)$id, $userId]);
         $entry = $stmt->fetch();
 
@@ -134,6 +137,9 @@ class VaultController {
         }
 
         $decrypted = decrypt_data($entry['encrypted_password']);
+
+        log_security_event('CREDENTIAL_DECRYPT', "Accessed encrypted password for: {$entry['app_name']}", $userId);
+
         json_response(['success' => true, 'password' => $decrypted]);
     }
 
@@ -143,8 +149,16 @@ class VaultController {
         }
 
         $db = getDB();
-        $stmt = $db->prepare('DELETE FROM password_entries WHERE id = ? AND user_id = ?');
+        $stmt = $db->prepare('SELECT app_name FROM password_entries WHERE id = ? AND user_id = ?');
         $stmt->execute([(int)$id, $userId]);
+        $entry = $stmt->fetch();
+
+        if ($entry) {
+            $del = $db->prepare('DELETE FROM password_entries WHERE id = ? AND user_id = ?');
+            $del->execute([(int)$id, $userId]);
+
+            log_security_event('CREDENTIAL_DELETE', "Deleted vault entry: {$entry['app_name']}", $userId);
+        }
 
         json_response(['success' => true, 'message' => 'Item deleted']);
     }

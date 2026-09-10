@@ -119,6 +119,15 @@ function initDatabaseSchema(PDO $pdo) {
                 one_time INTEGER DEFAULT 0,
                 used INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );",
+            "CREATE TABLE IF NOT EXISTS security_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                event_type TEXT NOT NULL,
+                ip_address TEXT,
+                user_agent TEXT,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );"
         ];
         foreach ($queries as $q) {
