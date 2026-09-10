@@ -1,0 +1,35 @@
+# xVault Enterprise Password Manager
+# Apache Production Server Configuration
+
+Options -Indexes +FollowSymLinks
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "DENY"
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# Block access to sensitive configuration files, storage, and databases
+<FilesMatch "^\.env|config\.php|db\.php|helpers\.php|schema\.sql|\.db|\.log|\.json|\.lock|\.ts$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Prevent direct browsing to storage or controllers
+    RewriteRule ^storage/ - [F,L]
+    RewriteRule ^controllers/ - [F,L]
+    RewriteRule ^templates/ - [F,L]
+
+    # Serve existing files/directories directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route all other URLs to index.php
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>

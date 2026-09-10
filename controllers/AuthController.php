@@ -1,0 +1,338 @@
+<?php
+/**
+ * xVault Enterprise Password Manager
+ * Auth Controller
+ */
+
+if (!defined('XVAULT_EXEC')) {
+    define('XVAULT_EXEC', true);
+}
+
+require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers.php';
+
+class AuthController {
+    private static $abusiveEmails = ['spam', 'abuse', 'root', 'webmaster', 'support'];
+    private static $restrictedPasswords = ['admin', 'root', 'password', '123456', 'password123'];
+
+    public static function handleRequest($action) {
+        switch ($action) {
+            case 'login':
+                self::login();
+                break;
+            case 'register':
+                self::register();
+                break;
+            case 'logout':
+                self::logout();
+                break;
+            case 'verify-email':
+                self::verifyEmail();
+                break;
+            case 'resend-verification':
+                self::resendVerification();
+                break;
+            case 'forgot-password':
+                self::forgotPassword();
+                break;
+            case 'reset-password':
+                self::resetPassword();
+                break;
+            case 'update-profile':
+                self::updateProfile();
+                break;
+            case 'change-password':
+                self::changePassword();
+                break;
+            case 'me':
+                self::me();
+                break;
+            default:
+                json_response(['error' => 'Invalid action'], 400);
+        }
+    }
+
+    public static function login() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $email = trim($input['email'] ?? '');
+        $password = $input['password'] ?? '';
+
+        if (empty($email) || empty($password)) {
+            json_response(['error' => 'Email and password are required'], 400);
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT * FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if (!$user || !verify_master_password($password, $user['password_hash'])) {
+            json_response(['error' => 'Invalid email or password'], 401);
+        }
+
+        if ($user['role'] !== 'admin' && empty($user['is_verified'])) {
+            json_response(['error' => 'Please verify your email address before logging in', 'unverified' => true], 403);
+        }
+
+        init_session();
+        regenerate_session();
+
+        $sessionUser = [
+            'id' => (int)$user['id'],
+            'email' => $user['email'],
+            'name' => $user['name'] ?: $user['email'],
+            'role' => $user['role']
+        ];
+        $_SESSION['user'] = $sessionUser;
+
+        json_response([
+            'success' => true,
+            'user' => $sessionUser,
+            'csrf_token' => csrf_token()
+        ]);
+    }
+
+    public static function register() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $email = strtolower(trim($input['email'] ?? ''));
+        $password = $input['password'] ?? '';
+        $name = trim($input['name'] ?? '');
+
+        if (empty($email) || empty($password) || empty($name)) {
+            json_response(['error' => 'All fields are required'], 400);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            json_response(['error' => 'Invalid email format'], 400);
+        }
+
+        $emailUser = explode('@', $email)[0];
+        if (in_array($emailUser, self::$abusiveEmails)) {
+            json_response(['error' => 'This email address username is restricted'], 400);
+        }
+
+        if (in_array(strtolower($password), self::$restrictedPasswords) || strlen($password) < 6) {
+            json_response(['error' => 'Password is too weak or restricted'], 400);
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            json_response(['error' => 'An account with this email already exists'], 400);
+        }
+
+        $passwordHash = hash_master_password($password);
+        $verificationToken = bin2hex(random_bytes(32));
+
+        // First registered user becomes admin if table is empty
+        $countStmt = $db->query('SELECT COUNT(*) as cnt FROM users');
+        $userCount = (int)$countStmt->fetch()['cnt'];
+        $role = ($userCount === 0) ? 'admin' : 'user';
+        $isVerified = ($role === 'admin') ? 1 : 0;
+
+        $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, is_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?)');
+        $insert->execute([$email, $passwordHash, $role, $name, $isVerified, $verificationToken]);
+        $userId = $db->lastInsertId();
+
+        if (!$isVerified) {
+            $verifyLink = APP_URL . '/verify-email?token=' . $verificationToken;
+            $html = "<h2>Welcome to xVault</h2><p>Hi {$name}, please verify your account by clicking <a href='{$verifyLink}'>this link</a>.</p>";
+            send_app_email($email, 'Verify Your xVault Account', $html);
+        }
+
+        json_response([
+            'success' => true,
+            'message' => $isVerified ? 'Admin account created successfully. You can log in immediately.' : 'Registration successful! Verification email sent.'
+        ], 201);
+    }
+
+    public static function logout() {
+        init_session();
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        session_destroy();
+        json_response(['success' => true]);
+    }
+
+    public static function verifyEmail() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_REQUEST;
+        $token = trim($input['token'] ?? '');
+
+        if (empty($token)) {
+            json_response(['error' => 'Verification token is required'], 400);
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT id FROM users WHERE verification_token = ?');
+        $stmt->execute([$token]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            json_response(['error' => 'Invalid or expired verification token'], 400);
+        }
+
+        $update = $db->prepare('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = ?');
+        $update->execute([$user['id']]);
+
+        json_response(['success' => true, 'message' => 'Email verified successfully! You can now log in.']);
+    }
+
+    public static function resendVerification() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $email = trim($input['email'] ?? '');
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT * FROM users WHERE email = ? AND is_verified = 0');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            json_response(['error' => 'User not found or already verified'], 404);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $update = $db->prepare('UPDATE users SET verification_token = ? WHERE id = ?');
+        $update->execute([$token, $user['id']]);
+
+        $verifyLink = APP_URL . '/verify-email?token=' . $token;
+        $html = "<h2>xVault Account Verification</h2><p>Please verify your email address: <a href='{$verifyLink}'>{$verifyLink}</a></p>";
+        send_app_email($email, 'Verify Your xVault Account', $html);
+
+        json_response(['success' => true, 'message' => 'Verification email resent']);
+    }
+
+    public static function forgotPassword() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $email = trim($input['email'] ?? '');
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT * FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            json_response(['error' => 'If this email exists, a password reset link has been sent.'], 200);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $expiry = date('Y-m-d H:i:s', time() + 3600);
+
+        $update = $db->prepare('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?');
+        $update->execute([$token, $expiry, $user['id']]);
+
+        $resetLink = APP_URL . '/reset-password?token=' . $token;
+        $html = "<h2>Password Reset Request</h2><p>Click the link to reset your xVault password (expires in 1 hour): <a href='{$resetLink}'>{$resetLink}</a></p>";
+        send_app_email($email, 'Password Reset Request', $html);
+
+        json_response(['success' => true, 'message' => 'Password reset email sent']);
+    }
+
+    public static function resetPassword() {
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $token = trim($input['token'] ?? '');
+        $password = $input['password'] ?? '';
+
+        if (empty($token) || empty($password)) {
+            json_response(['error' => 'Token and new password are required'], 400);
+        }
+
+        if (in_array(strtolower($password), self::$restrictedPasswords) || strlen($password) < 6) {
+            json_response(['error' => 'New password is too weak or restricted'], 400);
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > ?');
+        $stmt->execute([$token, date('Y-m-d H:i:s')]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            json_response(['error' => 'Invalid or expired reset token'], 400);
+        }
+
+        $passwordHash = hash_master_password($password);
+        $update = $db->prepare('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?');
+        $update->execute([$passwordHash, $user['id']]);
+
+        json_response(['success' => true, 'message' => 'Password reset successfully. You can now log in with your new password.']);
+    }
+
+    public static function updateProfile() {
+        $user = require_auth();
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $name = trim($input['name'] ?? '');
+        $email = strtolower(trim($input['email'] ?? ''));
+
+        if (empty($name)) {
+            json_response(['error' => 'Name cannot be empty'], 400);
+        }
+
+        $db = getDB();
+        if (!empty($email) && $email !== $user['email']) {
+            $stmt = $db->prepare('SELECT id FROM users WHERE email = ? AND id != ?');
+            $stmt->execute([$email, $user['id']]);
+            if ($stmt->fetch()) {
+                json_response(['error' => 'Email is already in use'], 400);
+            }
+
+            $vToken = bin2hex(random_bytes(32));
+            $up = $db->prepare('UPDATE users SET name = ?, email = ?, is_verified = 0, verification_token = ? WHERE id = ?');
+            $up->execute([$name, $email, $vToken, $user['id']]);
+
+            $_SESSION['user']['name'] = $name;
+            $_SESSION['user']['email'] = $email;
+
+            json_response(['success' => true, 'message' => 'Profile updated. Please verify your new email address.', 'reverify' => true]);
+        } else {
+            $up = $db->prepare('UPDATE users SET name = ? WHERE id = ?');
+            $up->execute([$name, $user['id']]);
+
+            $_SESSION['user']['name'] = $name;
+            json_response(['success' => true, 'message' => 'Profile updated successfully']);
+        }
+    }
+
+    public static function changePassword() {
+        $user = require_auth();
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $currentPassword = $input['currentPassword'] ?? '';
+        $newPassword = $input['newPassword'] ?? '';
+
+        if (empty($currentPassword) || empty($newPassword)) {
+            json_response(['error' => 'Current password and new password are required'], 400);
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare('SELECT password_hash FROM users WHERE id = ?');
+        $stmt->execute([$user['id']]);
+        $row = $stmt->fetch();
+
+        if (!$row || !verify_master_password($currentPassword, $row['password_hash'])) {
+            json_response(['error' => 'Incorrect current master password'], 401);
+        }
+
+        if (in_array(strtolower($newPassword), self::$restrictedPasswords) || strlen($newPassword) < 6) {
+            json_response(['error' => 'New password is too weak or restricted'], 400);
+        }
+
+        $newHash = hash_master_password($newPassword);
+        $up = $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+        $up->execute([$newHash, $user['id']]);
+
+        json_response(['success' => true, 'message' => 'Master password updated successfully']);
+    }
+
+    public static function me() {
+        $user = current_user();
+        if (!$user) {
+            json_response(['authenticated' => false], 401);
+        }
+        json_response(['authenticated' => true, 'user' => $user]);
+    }
+}
