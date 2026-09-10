@@ -157,6 +157,12 @@ if (strpos($path, '/api/') === 0) {
         ShareController::handleRequest('validate', $m[1]);
     }
 
+    // Platform Configuration APIs (Super Admin)
+    elseif (preg_match('#^/api/config/([a-z\-]+)$#', $path, $m)) {
+        require_once __DIR__ . '/controllers/ConfigController.php';
+        ConfigController::handleRequest($m[1]);
+    }
+
     // Health check API
     elseif ($path === '/api/health') {
         json_response(['status' => 'ok', 'version' => APP_VERSION, 'driver' => DB_DRIVER]);
@@ -240,6 +246,17 @@ switch ($path) {
     case '/admin/share':
         $currentView = 'admin_share';
         require __DIR__ . '/templates/pages/admin_share.php';
+        break;
+
+    case '/config':
+    case '/admin/config':
+        if (($user['role'] ?? '') !== 'admin') {
+            set_flash('error', 'Access denied. Administrator privileges required.');
+            header('Location: ' . APP_URL . '/dashboard');
+            exit;
+        }
+        $currentView = 'config';
+        require __DIR__ . '/templates/pages/config.php';
         break;
 
     case '/profile':

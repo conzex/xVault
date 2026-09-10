@@ -467,8 +467,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
 
             <div class="form-grid">
                 <div>
-                    <label>Account Username</label>
-                    <input type="text" id="admin_username" placeholder="Enter administrator username">
+                    <label>Account Username (Fixed)</label>
+                    <input type="text" id="admin_username" value="admin" readonly style="background: #F1F5F9; color: #475569; font-weight: 700; cursor: not-allowed;">
                 </div>
                 <div>
                     <label>Email Address</label>

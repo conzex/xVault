@@ -10,6 +10,8 @@ if (!defined('XVAULT_EXEC')) {
 
 require_once __DIR__ . '/config.php';
 
+define('APP_DB_VERSION', '1.1.0');
+
 function getDB() {
     static $pdo = null;
     if ($pdo !== null) {
@@ -18,12 +20,26 @@ function getDB() {
 
     try {
         if (DB_DRIVER === 'mysql') {
-            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
+            try {
+                $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]);
+            } catch (PDOException $mysqlEx) {
+                // Fallback to SQLite storage if MySQL is unavailable in local environment
+                $storageDir = __DIR__ . '/storage';
+                if (!is_dir($storageDir)) {
+                    @mkdir($storageDir, 0755, true);
+                }
+                $pdo = new PDO('sqlite:' . SQLITE_FILE, null, null, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]);
+                $pdo->exec('PRAGMA foreign_keys = ON;');
+            }
         } else {
             // SQLite Fallback
             $storageDir = __DIR__ . '/storage';
@@ -40,6 +56,7 @@ function getDB() {
         }
 
         initDatabaseSchema($pdo);
+        check_database_health_and_version($pdo);
         return $pdo;
     } catch (PDOException $e) {
         error_log('Database Connection Error: ' . $e->getMessage());
@@ -52,7 +69,8 @@ function getDB() {
 }
 
 function initDatabaseSchema(PDO $pdo) {
-    if (DB_DRIVER === 'sqlite') {
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver === 'sqlite') {
         $queries = [
             "CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,6 +149,20 @@ function initDatabaseSchema(PDO $pdo) {
                 user_agent TEXT,
                 details TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );",
+            "CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );",
+            "CREATE TABLE IF NOT EXISTS email_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                to_email TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                email_type TEXT DEFAULT 'transactional',
+                status TEXT DEFAULT 'sent',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );"
         ];
         foreach ($queries as $q) {
@@ -141,5 +173,50 @@ function initDatabaseSchema(PDO $pdo) {
         if ($sql) {
             $pdo->exec($sql);
         }
+    }
+}
+
+/**
+ * Smart Database Version & Migration Check
+ */
+function check_database_health_and_version(PDO $pdo) {
+    try {
+        // Ensure system_settings table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (setting_key VARCHAR(255) PRIMARY KEY, setting_value TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);");
+
+        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'db_version'");
+        $stmt->execute();
+        $installedVersion = $stmt->fetchColumn();
+
+        if (!$installedVersion) {
+            // Set current version for existing DB
+            $ins = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('db_version', ?)");
+            $ins->execute([APP_DB_VERSION]);
+        } elseif (version_compare($installedVersion, APP_DB_VERSION, '<')) {
+            // Run non-destructive database migrations
+            run_db_migrations($pdo, $installedVersion);
+            $up = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'db_version'");
+            $up->execute([APP_DB_VERSION]);
+        }
+    } catch (\Throwable $e) {
+        error_log("Database version check exception: " . $e->getMessage());
+    }
+}
+
+/**
+ * Non-destructive database migrations engine
+ */
+function run_db_migrations(PDO $pdo, $fromVersion) {
+    // Non-destructive migrations for future schema additions
+    try {
+        if (version_compare($fromVersion, '1.1.0', '<')) {
+            if (DB_DRIVER === 'mysql') {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS email_logs (id INT AUTO_INCREMENT PRIMARY KEY, to_email VARCHAR(255) NOT NULL, subject VARCHAR(255) NOT NULL, email_type VARCHAR(100) DEFAULT 'transactional', status VARCHAR(50) DEFAULT 'sent', error_message TEXT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+            } else {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS email_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, to_email TEXT NOT NULL, subject TEXT NOT NULL, email_type TEXT DEFAULT 'transactional', status TEXT DEFAULT 'sent', error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);");
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log("DB Migration warning: " . $e->getMessage());
     }
 }

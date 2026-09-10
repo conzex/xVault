@@ -204,17 +204,12 @@ class InstallController {
     private static function validateAdmin() {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true);
 
-        $username = trim($input['username'] ?? '');
+        $username = 'admin';
         $fname = trim($input['first_name'] ?? '');
         $lname = trim($input['last_name'] ?? '');
         $email = trim($input['email'] ?? '');
         $pass = $input['password'] ?? '';
         $passConfirm = $input['password_confirm'] ?? '';
-
-        if (empty($username) || strlen($username) < 3) {
-            json_response(['error' => 'Username must be at least 3 characters.'], 400);
-            return;
-        }
 
         if (empty($fname) || empty($lname)) {
             json_response(['error' => 'First Name and Last Name are required.'], 400);

@@ -432,10 +432,25 @@ function send_app_email($toEmail, $subject, $htmlBody) {
         fgets($socket, 512);
         fputs($socket, "QUIT\r\n");
         fclose($socket);
+        log_email_delivery($toEmail, $subject, 'transactional', 'sent');
         return true;
     } catch (\Throwable $e) {
         error_log("SMTP exception sending email to {$toEmail}: " . $e->getMessage());
+        log_email_delivery($toEmail, $subject, 'transactional', 'failed', $e->getMessage());
         return false;
+    }
+}
+
+/**
+ * Log Email Delivery Attempt in Database
+ */
+function log_email_delivery($toEmail, $subject, $emailType = 'transactional', $status = 'sent', $errorMessage = null) {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('INSERT INTO email_logs (to_email, subject, email_type, status, error_message) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute([$toEmail, $subject, $emailType, $status, $errorMessage]);
+    } catch (\Throwable $e) {
+        error_log("Email log write exception: " . $e->getMessage());
     }
 }
 
