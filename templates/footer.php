@@ -7,8 +7,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 <span style="color: var(--color-brand-black);">x</span><span style="color: var(--color-brand-red);">Vault</span>
             </div>
             <p>© <?= date('Y') ?> Xvault. All rights reserved.</p>
-            <p style="font-weight: 700; background: linear-gradient(90deg, #D32F2F, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                A Cogent Global Product
+            <p class="rainbow-text">
+                A Conzex Global Product
             </p>
         </div>
     </footer>
