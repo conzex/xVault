@@ -6,9 +6,20 @@ $currentView = 'admin_share';
 $admin = require_admin();
 $db = getDB();
 
-$stmt = $db->prepare('SELECT * FROM shared_links ORDER BY created_at DESC');
+$stmt = $db->prepare('
+    SELECT s.*, p.app_name, u.email as owner_email
+    FROM shared_links s
+    LEFT JOIN password_entries p ON s.entry_id = p.id
+    LEFT JOIN users u ON s.created_by = u.id
+    ORDER BY s.created_at DESC
+');
 $stmt->execute();
 $links = $stmt->fetchAll();
+
+// Fetch password entries for dropdown
+$passStmt = $db->prepare('SELECT id, app_name, username FROM password_entries ORDER BY app_name ASC');
+$passStmt->execute();
+$entries = $passStmt->fetchAll();
 
 require __DIR__ . '/../header.php';
 ?>
@@ -19,7 +30,7 @@ require __DIR__ . '/../header.php';
         <div class="container">
             <div style="margin-bottom: 28px;">
                 <h1 style="font-size: 24px; font-weight: 800; color: #0F172A;">Enterprise Share Center</h1>
-                <p style="font-size: 14px; color: #64748B; margin-top: 2px;">Generate secure, expiring access links for customers and clients</p>
+                <p style="font-size: 14px; color: #64748B; margin-top: 2px;">Generate secure, expiring access links for specific individual credential records</p>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 28px;">
@@ -28,8 +39,18 @@ require __DIR__ . '/../header.php';
                     <h3 style="font-size: 16px; font-weight: 700; color: #0F172A; margin-bottom: 16px;">Generate Secure Share Link</h3>
                     <form id="form-share-generate" onsubmit="handleGenerateShareLink(event)">
                         <div class="form-group">
-                            <label class="form-label">Customer / Client Email *</label>
-                            <input type="email" name="email" id="share-email" class="form-control" placeholder="Enter customer or client email address" required>
+                            <label class="form-label">Select Credential Record *</label>
+                            <select name="entry_id" id="share-entry-id" class="form-control" required>
+                                <option value="">-- Choose Credential Record --</option>
+                                <?php foreach ($entries as $item): ?>
+                                    <option value="<?= $item['id'] ?>"><?= e($item['app_name']) ?> <?= !empty($item['username']) ? '(' . e($item['username']) . ')' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Customer / Client Email (Optional)</label>
+                            <input type="email" name="email" id="share-email" class="form-control" placeholder="Enter customer or client email address">
                         </div>
 
                         <div class="form-group">
@@ -74,9 +95,10 @@ require __DIR__ . '/../header.php';
                                 <table class="vault-table">
                                     <thead>
                                         <tr>
-                                            <th>Recipient Email</th>
+                                            <th>Shared Credential</th>
+                                            <th>Recipient</th>
                                             <th>Expiration</th>
-                                            <th>Type</th>
+                                            <th>Accesses</th>
                                             <th>Status</th>
                                             <th style="text-align: right;">Action</th>
                                         </tr>
@@ -84,17 +106,24 @@ require __DIR__ . '/../header.php';
                                     <tbody>
                                         <?php foreach ($links as $l): 
                                             $isExpired = !empty($l['expires_at']) && strtotime($l['expires_at']) < time();
-                                            $isUsed = !empty($l['one_time']) && !empty($l['used']);
+                                            $isUsed = (!empty($l['one_time']) && !empty($l['used'])) || (!empty($l['max_uses']) && (int)($l['access_count'] ?? 0) >= (int)$l['max_uses']);
                                             $fullUrl = APP_URL . '/share/' . $l['token'];
                                         ?>
                                             <tr id="share-row-<?= $l['id'] ?>">
-                                                <td style="font-weight: 600; color: #0F172A;"><?= e($l['target_email']) ?></td>
+                                                <td style="font-weight: 700; color: #0F172A;">
+                                                    <?= e($l['app_name'] ?: 'Entry #' . $l['entry_id']) ?>
+                                                    <span style="display: block; font-weight: 400; font-size: 11px; color: #64748B;">By: <?= e($l['owner_email'] ?? 'Admin') ?></span>
+                                                </td>
+                                                <td style="font-size: 13px; color: #334155;"><?= e($l['target_email'] ?: 'Any link holder') ?></td>
                                                 <td style="font-size: 12px; color: #64748B;">
-                                                    <?= !empty($l['expires_at']) ? date('M j, Y H:i', strtotime($l['expires_at'])) : 'Lifetime' ?>
+                                                    <?= !empty($l['expires_at']) ? date('M j, Y H:i', strtotime($l['expires_at'])) : 'Never' ?>
+                                                    <?php if (!empty($l['one_time'])): ?>
+                                                        <span style="display: block; font-size: 10px; color: #D32F2F; font-weight: 700;">(One-Time View)</span>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #F1F5F9; color: #475569; font-weight: 600;">
-                                                        <?= !empty($l['one_time']) ? 'One-Time' : 'Standard' ?>
+                                                    <span style="font-size: 12px; font-weight: 700; color: #0F172A; background: #F1F5F9; padding: 2px 8px; border-radius: 10px;">
+                                                        <?= (int)($l['access_count'] ?? 0) ?> views
                                                     </span>
                                                 </td>
                                                 <td>
@@ -153,7 +182,13 @@ async function handleGenerateShareLink(e) {
 }
 
 async function revokeShareLink(id) {
-    if (!confirm('Are you sure you want to revoke this share link?')) return;
+    const confirmed = await CustomModal.confirm({
+        title: 'Revoke Share Link',
+        message: 'Are you sure you want to revoke this share link? Anyone holding this link will immediately lose access.',
+        confirmText: 'Revoke Link',
+        isDanger: true
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch(`<?= APP_URL ?>/api/share/revoke/${id}`, { method: 'DELETE' });
         const result = await res.json();

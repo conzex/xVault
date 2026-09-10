@@ -137,11 +137,15 @@ function initDatabaseSchema(PDO $pdo) {
             "CREATE TABLE IF NOT EXISTS shared_links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 token TEXT UNIQUE NOT NULL,
+                entry_id INTEGER NOT NULL REFERENCES password_entries(id) ON DELETE CASCADE,
                 created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 target_email TEXT,
                 expires_at TIMESTAMP,
                 one_time INTEGER DEFAULT 0,
                 used INTEGER DEFAULT 0,
+                access_count INTEGER DEFAULT 0,
+                max_uses INTEGER,
+                last_accessed_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );",
             "CREATE TABLE IF NOT EXISTS security_logs (
@@ -189,16 +193,13 @@ function check_database_health_and_version(PDO $pdo) {
 
         $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'db_version'");
         $stmt->execute();
-        $installedVersion = $stmt->fetchColumn();
+        $installedVersion = $stmt->fetchColumn() ?: '1.0.0';
 
-        if (!$installedVersion) {
-            // Set current version for existing DB
-            $ins = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('db_version', ?)");
-            $ins->execute([APP_DB_VERSION]);
-        } elseif (version_compare($installedVersion, APP_DB_VERSION, '<')) {
-            // Run non-destructive database migrations
-            run_db_migrations($pdo, $installedVersion);
-            $up = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'db_version'");
+        // Always run idempotent migrations to guarantee missing columns are added
+        run_db_migrations($pdo, $installedVersion);
+
+        if (version_compare($installedVersion, APP_DB_VERSION, '<')) {
+            $up = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('db_version', ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
             $up->execute([APP_DB_VERSION]);
         }
     } catch (\Throwable $e) {
@@ -220,13 +221,29 @@ function run_db_migrations(PDO $pdo, $fromVersion) {
             }
         }
         
-        // Version 1.2.0: Email verification security enhancements
+        // Version 1.2.0 & 2.0: Email verification and single record share enhancements
         try {
             $pdo->exec("ALTER TABLE users ADD COLUMN verification_token_hash VARCHAR(255) NULL");
         } catch (\Throwable $e) {}
 
         try {
             $pdo->exec("ALTER TABLE users ADD COLUMN verification_token_expiry DATETIME NULL");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE shared_links ADD COLUMN entry_id INT NULL");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE shared_links ADD COLUMN access_count INT DEFAULT 0");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE shared_links ADD COLUMN max_uses INT NULL");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE shared_links ADD COLUMN last_accessed_at DATETIME NULL");
         } catch (\Throwable $e) {}
     } catch (\Throwable $e) {
         error_log("DB Migration warning: " . $e->getMessage());

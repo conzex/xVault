@@ -10,7 +10,7 @@ if (!defined('XVAULT_EXEC')) {
 
 define('APP_ENV', getenv('APP_ENV') ?: 'production');
 define('APP_NAME', 'xVault');
-define('APP_VERSION', '1.0.0');
+define('APP_VERSION', '2.0');
 
 // Domain / Base URL configuration ('auto' dynamically auto-detects current host, domain, & subfolder)
 define('APP_URL_OVERRIDE', getenv('APP_URL') ?: 'auto');

@@ -205,6 +205,11 @@ if ($path === '/reset-password') {
     exit;
 }
 
+if ($path === '/password-generator' || $path === '/password-generator.php') {
+    require __DIR__ . '/password-generator.php';
+    exit;
+}
+
 if (preg_match('#^/share/([a-f0-9]+)$#i', $path, $m)) {
     $shareToken = $m[1];
     require __DIR__ . '/templates/pages/public_share.php';
@@ -227,6 +232,11 @@ switch ($path) {
     case '/vault':
         $currentView = 'vault';
         require __DIR__ . '/templates/pages/dashboard.php';
+        break;
+
+    case '/favorites':
+        $currentView = 'favorites';
+        require __DIR__ . '/templates/pages/favorites.php';
         break;
 
     case '/folders':

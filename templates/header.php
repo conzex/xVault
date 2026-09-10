@@ -28,8 +28,9 @@ $csrfToken = csrf_token();
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
             </div>
-            <div class="logo-text">
+            <div class="logo-text" style="display: flex; align-items: center;">
                 <span class="x">x</span><span class="vault">Vault</span>
+                <span class="version-badge" style="font-size: 11px; font-weight: 700; background: rgba(211, 47, 47, 0.08); color: var(--color-brand-red); border: 1px solid rgba(211, 47, 47, 0.2); padding: 2px 7px; border-radius: 12px; margin-left: 8px;">v<?= APP_VERSION ?></span>
             </div>
         </div>
 

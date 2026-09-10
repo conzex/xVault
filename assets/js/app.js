@@ -246,9 +246,106 @@ async function toggleFavoriteItem(itemId, btnElement) {
     }
 }
 
+/* Centralized Lightbox / Modal Overlay Notification System */
+window.CustomModal = {
+    confirm(options = {}) {
+        return new Promise((resolve) => {
+            const title = options.title || 'Confirm Action';
+            const message = options.message || 'Are you sure you want to proceed?';
+            const confirmText = options.confirmText || 'Confirm';
+            const cancelText = options.cancelText || 'Cancel';
+            const isDanger = options.isDanger !== false;
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop open custom-modal-backdrop';
+            backdrop.style.zIndex = '99999';
+
+            backdrop.innerHTML = `
+                <div class="modal" style="max-width: 440px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${isDanger ? '#FEF2F2' : '#EFF6FF'}; color: ${isDanger ? '#DC2626' : '#2563EB'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; font-weight: bold;">
+                            ${isDanger ? '⚠️' : 'ℹ️'}
+                        </div>
+                        <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0F172A;">${escapeHtml(title)}</h3>
+                    </div>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.5;">${escapeHtml(message)}</p>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary custom-modal-cancel" style="padding: 8px 16px; font-size: 13px;">${escapeHtml(cancelText)}</button>
+                        <button type="button" class="btn btn-primary custom-modal-confirm" style="padding: 8px 18px; font-size: 13px; ${isDanger ? 'background: #DC2626; border-color: #DC2626;' : ''}">${escapeHtml(confirmText)}</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(backdrop);
+
+            const btnCancel = backdrop.querySelector('.custom-modal-cancel');
+            const btnConfirm = backdrop.querySelector('.custom-modal-confirm');
+
+            function cleanup(result) {
+                backdrop.classList.remove('open');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(result);
+                if (result && typeof options.onConfirm === 'function') {
+                    options.onConfirm();
+                }
+            }
+
+            btnCancel.addEventListener('click', () => cleanup(false));
+            btnConfirm.addEventListener('click', () => cleanup(true));
+            backdrop.addEventListener('click', (e) => {
+                if (e.target === backdrop) cleanup(false);
+            });
+        });
+    },
+
+    alert(options = {}) {
+        return new Promise((resolve) => {
+            const title = typeof options === 'string' ? 'Notice' : (options.title || 'Notice');
+            const message = typeof options === 'string' ? options : (options.message || '');
+            const okText = options.okText || 'OK';
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop open custom-modal-backdrop';
+            backdrop.style.zIndex = '99999';
+
+            backdrop.innerHTML = `
+                <div class="modal" style="max-width: 420px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); text-align: center;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 17px; font-weight: 700; color: #0F172A;">${escapeHtml(title)}</h3>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.5;">${escapeHtml(message)}</p>
+                    <button type="button" class="btn btn-primary custom-modal-ok" style="padding: 8px 24px; font-size: 13px; min-width: 100px;">${escapeHtml(okText)}</button>
+                </div>
+            `;
+
+            document.body.appendChild(backdrop);
+            const btnOk = backdrop.querySelector('.custom-modal-ok');
+
+            function cleanup() {
+                backdrop.classList.remove('open');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(true);
+            }
+
+            btnOk.addEventListener('click', cleanup);
+            backdrop.addEventListener('click', (e) => {
+                if (e.target === backdrop) cleanup();
+            });
+        });
+    }
+};
+
+/* Override native alert for full consistency */
+window.nativeAlert = window.alert;
+window.alert = function(msg) { CustomModal.alert({ title: 'Notice', message: msg }); };
+
 /* Delete Vault Item AJAX handler */
 async function deleteVaultItem(itemId, itemType = 'vault') {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    const confirmed = await CustomModal.confirm({
+        title: 'Delete Item',
+        message: 'Are you sure you want to permanently delete this item? This action cannot be undone.',
+        confirmText: 'Delete Item',
+        isDanger: true
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch(`/api/${itemType}/${itemId}`, {
@@ -322,3 +419,118 @@ async function fetchSecurityDashboardData() {
         console.error('Security poll error:', err);
     }
 }
+
+/* Individual Item Share Modal Handler */
+window.openShareItemModal = function(entryId, appName) {
+    let modal = document.getElementById('share-item-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'share-item-modal';
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 480px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
+                    <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0F172A;" id="share-modal-title">Share Credential</h3>
+                    <button type="button" class="toast-close" onclick="closeModal('share-item-modal')" style="font-size: 20px;">&times;</button>
+                </div>
+                <input type="hidden" id="share-modal-entry-id" value="" />
+                
+                <div id="share-modal-form-view">
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Expiration Time</label>
+                        <select id="share-modal-expiry" class="form-control" style="font-size: 13px;">
+                            <option value="1h">1 Hour</option>
+                            <option value="24h" selected>24 Hours</option>
+                            <option value="7d">7 Days</option>
+                            <option value="30d">30 Days</option>
+                            <option value="lifetime">Lifetime (No Expiry)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Access Limitation</label>
+                        <select id="share-modal-max-uses" class="form-control" style="font-size: 13px;">
+                            <option value="0" selected>Unlimited views (until expiry)</option>
+                            <option value="1">One-time view only (1 view)</option>
+                            <option value="5">Max 5 views</option>
+                            <option value="10">Max 10 views</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Recipient Email (Optional)</label>
+                        <input type="email" id="share-modal-email" class="form-control" placeholder="e.g. recipient@example.com" style="font-size: 13px;" />
+                        <span style="font-size: 11px; color: #64748B; margin-top: 4px; display: block;">If provided, an email with the link will be dispatched automatically.</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('share-item-modal')" style="font-size: 13px;">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-generate-share-link" onclick="submitShareItemModal()" style="font-size: 13px;">Generate Share Link</button>
+                    </div>
+                </div>
+
+                <div id="share-modal-result-view" style="display: none; text-align: center; padding-top: 10px;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #DCFCE7; color: #16A34A; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 12px;">✓</div>
+                    <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 6px 0;">Share Link Ready</h4>
+                    <p style="font-size: 13px; color: #64748B; margin-bottom: 16px;">Anyone with this link can view only this specific credential before expiry.</p>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                        <input type="text" id="share-modal-result-url" class="form-control" readonly style="font-size: 12px; font-family: monospace;" />
+                        <button type="button" class="btn btn-primary" onclick="copyToClipboard(document.getElementById('share-modal-result-url').value, 'Share URL copied to clipboard')" style="white-space: nowrap; font-size: 12px;">Copy Link</button>
+                    </div>
+
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('share-item-modal')" style="width: 100%; font-size: 13px;">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById('share-modal-entry-id').value = entryId;
+    document.getElementById('share-modal-title').textContent = 'Share ' + (appName || 'Credential');
+    document.getElementById('share-modal-form-view').style.display = 'block';
+    document.getElementById('share-modal-result-view').style.display = 'none';
+    document.getElementById('share-modal-email').value = '';
+    
+    openModal('share-item-modal');
+};
+
+window.submitShareItemModal = async function() {
+    const entryId = document.getElementById('share-modal-entry-id').value;
+    const expiry = document.getElementById('share-modal-expiry').value;
+    const maxUses = parseInt(document.getElementById('share-modal-max-uses').value, 10);
+    const email = document.getElementById('share-modal-email').value.trim();
+    const btn = document.getElementById('btn-generate-share-link');
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        const res = await fetch('/api/share/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                entry_id: entryId,
+                expiry: expiry,
+                max_uses: maxUses,
+                one_time: maxUses === 1 ? 1 : 0,
+                email: email
+            })
+        });
+        const data = await res.json();
+        if (data.success && data.url) {
+            document.getElementById('share-modal-result-url').value = data.url;
+            document.getElementById('share-modal-form-view').style.display = 'none';
+            document.getElementById('share-modal-result-view').style.display = 'block';
+            toast.success('Share link generated!');
+        } else {
+            toast.error(data.error || 'Failed to generate share link');
+        }
+    } catch (err) {
+        toast.error('Network error during link generation');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Share Link';
+    }
+};
+

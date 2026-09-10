@@ -60,22 +60,42 @@ class SecurityController {
         }
 
         // Real Health Score calculation
-        $deductions = ($weakCount * 15) + ($reusedCount * 10);
-        $score = $totalPasswords > 0 ? max(20, min(100, 100 - $deductions)) : 100;
-
+        $userObj = current_user();
+        $isUnverified = empty($userObj['is_verified']);
+        
         // 2. Failed logins in last 24h
         $failedStmt = $db->prepare("
             SELECT COUNT(*) as cnt FROM security_logs 
             WHERE (user_id = ? OR details LIKE ?) AND event_type = 'LOGIN_FAILED' AND created_at >= ?
         ");
         $since = date('Y-m-d H:i:s', time() - 86400);
-        $userObj = current_user();
         $failedStmt->execute([$userId, '%' . ($userObj['email'] ?? '') . '%', $since]);
         $failedCount = (int)$failedStmt->fetch()['cnt'];
 
+        if ($totalPasswords === 0) {
+            json_response([
+                'success' => true,
+                'has_data' => false,
+                'score' => null,
+                'score_text' => 'Not available yet',
+                'score_message' => 'Add password entries to calculate your security posture.',
+                'total_passwords' => 0,
+                'weak_passwords' => 0,
+                'reused_passwords' => 0,
+                'failed_logins_24h' => $failedCount,
+                'last_updated' => date('H:i:s')
+            ]);
+        }
+
+        $deductions = ($weakCount * 15) + ($reusedCount * 10) + ($failedCount * 5) + ($isUnverified ? 20 : 0);
+        $score = max(10, min(100, 100 - $deductions));
+
         json_response([
             'success' => true,
+            'has_data' => true,
             'score' => $score,
+            'score_text' => $score . '%',
+            'score_message' => ($score >= 80 ? 'Strong vault security' : ($score >= 60 ? 'Fair security posture' : 'Action recommended')),
             'total_passwords' => $totalPasswords,
             'weak_passwords' => $weakCount,
             'reused_passwords' => $reusedCount,

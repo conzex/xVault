@@ -31,8 +31,17 @@ foreach ($counts as $pText => $cnt) {
     }
 }
 
-$deductions = ($weakCount * 15) + ($reusedCount * 10);
-$score = $totalCount > 0 ? max(20, min(100, 100 - $deductions)) : 100;
+$hasData = ($totalCount > 0);
+if ($hasData) {
+    $deductions = ($weakCount * 15) + ($reusedCount * 10) + (empty($user['is_verified']) ? 20 : 0);
+    $score = max(10, min(100, 100 - $deductions));
+    $scoreText = $score . '%';
+    $gaugeColor = $score >= 80 ? '#22C55E' : ($score >= 60 ? '#3B82F6' : '#EF4444');
+} else {
+    $score = null;
+    $scoreText = 'N/A';
+    $gaugeColor = '#94A3B8';
+}
 
 // Fetch initial security logs
 $logStmt = $db->prepare('
@@ -66,11 +75,13 @@ require __DIR__ . '/../header.php';
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px; margin-bottom: 32px;">
                 <!-- Health Gauge -->
                 <div class="card" style="padding: 32px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <div style="width: 130px; height: 130px; border-radius: 65px; border: 8px solid <?= $score >= 80 ? '#22C55E' : ($score >= 60 ? '#3B82F6' : '#EF4444') ?>; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-                        <span id="sec-score-val" style="font-size: 38px; font-weight: 800; color: #0F172A;"><?= $score ?>%</span>
+                    <div style="width: 130px; height: 130px; border-radius: 65px; border: 8px solid <?= $gaugeColor ?>; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                        <span id="sec-score-val" style="font-size: <?= $hasData ? '36px' : '22px' ?>; font-weight: 800; color: #0F172A;"><?= $scoreText ?></span>
                     </div>
-                    <h3 style="font-size: 18px; font-weight: 800; color: #0F172A;">Vault Health Score</h3>
-                    <p style="font-size: 12px; color: #64748B; margin-top: 4px;">Computed live from stored secret entropy.</p>
+                    <h3 style="font-size: 18px; font-weight: 800; color: #0F172A;">Vault Security Posture</h3>
+                    <p id="sec-score-msg" style="font-size: 12px; color: #64748B; margin-top: 4px; line-height: 1.4;">
+                        <?= $hasData ? 'Computed live from stored credential entropy.' : 'Not available yet — add password entries to calculate security score.' ?>
+                    </p>
                 </div>
 
                 <!-- Live Metrics Breakdown -->

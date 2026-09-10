@@ -77,13 +77,18 @@ CREATE TABLE IF NOT EXISTS secure_notes (
 CREATE TABLE IF NOT EXISTS shared_links (
     id INT AUTO_INCREMENT PRIMARY KEY,
     token VARCHAR(255) NOT NULL UNIQUE,
+    entry_id INT NOT NULL,
     created_by INT NOT NULL,
     target_email VARCHAR(255) NULL,
     expires_at DATETIME NULL,
     one_time TINYINT(1) DEFAULT 0,
     used TINYINT(1) DEFAULT 0,
+    access_count INT DEFAULT 0,
+    max_uses INT NULL,
+    last_accessed_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (entry_id) REFERENCES password_entries(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS security_logs (

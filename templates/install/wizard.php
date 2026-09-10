@@ -352,7 +352,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             </div>
         </div>
         <div style="font-size: 11px; font-weight: 700; background: #F1F5F9; padding: 4px 10px; border-radius: 20px; color: #64748B;">
-            v1.0.0
+            v<?= APP_VERSION ?>
         </div>
     </div>
 

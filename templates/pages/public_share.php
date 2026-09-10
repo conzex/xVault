@@ -2,48 +2,52 @@
 if (!defined('XVAULT_EXEC')) die('Direct access denied');
 $pageTitle = 'Secure Shared Vault Access - xVault';
 
-$token = $shareToken ?? '';
+$token = $shareToken ?? ($_GET['token'] ?? '');
 $db = getDB();
 
-$stmt = $db->prepare('SELECT * FROM shared_links WHERE token = ?');
-$stmt->execute([$token]);
-$link = $stmt->fetch();
-
 $error = null;
-$items = [];
+$item = null;
+$linkInfo = null;
 
-if (!$link) {
-    $error = 'Invalid or non-existent share link token.';
-} elseif (!empty($link['expires_at']) && strtotime($link['expires_at']) < time()) {
-    $error = 'This share link has expired and is no longer accessible.';
-} elseif (!empty($link['one_time']) && !empty($link['used'])) {
-    $error = 'This one-time share link has already been accessed and invalidated.';
+if (empty($token)) {
+    $error = 'No share token provided.';
 } else {
-    // If valid one-time link, mark as used upon access
-    if (!empty($link['one_time'])) {
-        $up = $db->prepare('UPDATE shared_links SET used = 1 WHERE id = ?');
-        $up->execute([$link['id']]);
-    }
-
-    // Retrieve shared items for target email / creator
-    $passStmt = $db->prepare('
-        SELECT p.app_name, p.login_url, p.username, p.encrypted_password
-        FROM password_entries p
-        LEFT JOIN folders f ON p.folder_id = f.id
-        WHERE f.customer_email = ? OR p.user_id = ?
-        ORDER BY p.created_at DESC
+    $stmt = $db->prepare('
+        SELECT s.*, p.app_name, p.login_url, p.username, p.encrypted_password, p.created_at as item_created_at
+        FROM shared_links s
+        JOIN password_entries p ON s.entry_id = p.id
+        WHERE s.token = ?
     ');
-    $passStmt->execute([$link['target_email'], $link['created_by']]);
-    $rawItems = $passStmt->fetchAll();
+    $stmt->execute([$token]);
+    $link = $stmt->fetch();
 
-    $items = array_map(function($p) {
-        return [
-            'app_name' => $p['app_name'],
-            'login_url' => $p['login_url'],
-            'username' => $p['username'],
-            'password' => decrypt_data($p['encrypted_password'])
+    if (!$link) {
+        $error = 'Invalid, revoked, or non-existent share link.';
+    } elseif (!empty($link['expires_at']) && strtotime($link['expires_at']) < time()) {
+        $error = 'This share link has expired and is no longer accessible.';
+    } elseif (!empty($link['one_time']) && !empty($link['used'])) {
+        $error = 'This one-time share link has already been used and is now invalidated.';
+    } elseif (!empty($link['max_uses']) && (int)$link['access_count'] >= (int)$link['max_uses']) {
+        $error = 'This share link has reached its maximum allowed access count.';
+    } else {
+        $newCount = (int)$link['access_count'] + 1;
+        $nowStr = date('Y-m-d H:i:s');
+        $isUsedNow = (!empty($link['one_time']) || (!empty($link['max_uses']) && $newCount >= (int)$link['max_uses'])) ? 1 : 0;
+
+        $up = $db->prepare('UPDATE shared_links SET access_count = ?, last_accessed_at = ?, used = ? WHERE id = ?');
+        $up->execute([$newCount, $nowStr, $isUsedNow, $link['id']]);
+
+        log_security_event('SHARE_LINK_ACCESSED', "Share link accessed for item #{$link['entry_id']} ({$link['app_name']})", null);
+
+        $linkInfo = $link;
+        $item = [
+            'app_name' => $link['app_name'],
+            'login_url' => $link['login_url'],
+            'username' => $link['username'],
+            'password' => decrypt_data($link['encrypted_password']),
+            'created_at' => $link['item_created_at']
         ];
-    }, $rawItems);
+    }
 }
 
 require __DIR__ . '/../header.php';
@@ -73,69 +77,55 @@ require __DIR__ . '/../header.php';
                 <p style="font-size: 14px; margin: 0;"><?= e($error) ?></p>
             </div>
         <?php else: ?>
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <p style="font-size: 13px; color: #475569; margin: 0;">
-                    Shared with: <strong><?= e($link['target_email']) ?></strong>
-                    <?php if (!empty($link['one_time'])): ?>
-                        <span style="float: right; color: #D32F2F; font-weight: 700;">[One-Time Link]</span>
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 14px 18px; border-radius: 8px; margin-bottom: 24px; font-size: 13px; color: #475569; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span>Access Rule: </span>
+                    <strong style="color: #0F172A;"><?= !empty($linkInfo['one_time']) ? 'One-Time View' : 'Time-Limited Link' ?></strong>
+                    <?php if (!empty($linkInfo['target_email'])): ?>
+                        <span style="margin-left: 8px;">(Shared for: <strong><?= e($linkInfo['target_email']) ?></strong>)</span>
                     <?php endif; ?>
-                </p>
+                </div>
+                <?php if (!empty($linkInfo['expires_at'])): ?>
+                    <span style="font-size: 12px; color: #64748B;">Expires: <?= date('M j, Y H:i', strtotime($linkInfo['expires_at'])) ?></span>
+                <?php endif; ?>
             </div>
 
-            <?php if (empty($items)): ?>
-                <div style="text-align: center; padding: 40px; color: #94A3B8; font-size: 14px;">
-                    No shared credentials were found for this token.
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #F1F5F9;">
+                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--color-brand-red); letter-spacing: 0.05em; margin-bottom: 4px;">Shared Credential Record</div>
+                    <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #0F172A;"><?= e($item['app_name']) ?></h2>
+                    <?php if (!empty($item['login_url'])): ?>
+                        <a href="<?= e($item['login_url']) ?>" target="_blank" style="font-size: 13px; color: #0284C7; text-decoration: none; word-break: break-all; display: inline-block; margin-top: 4px;"><?= e($item['login_url']) ?> ↗</a>
+                    <?php endif; ?>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="vault-table">
-                        <thead>
-                            <tr>
-                                <th>Site / Application</th>
-                                <th>Username</th>
-                                <th>Password</th>
-                                <th style="text-align: right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($items as $idx => $item): ?>
-                                <tr>
-                                    <td>
-                                        <p style="font-weight: 700; color: #0F172A; margin: 0;"><?= e($item['app_name']) ?></p>
-                                        <?php if (!empty($item['login_url'])): ?>
-                                            <a href="<?= e($item['login_url']) ?>" target="_blank" style="font-size: 11px; color: #64748B; text-decoration: none;"><?= e($item['login_url']) ?></a>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span><?= e($item['username']) ?></span>
-                                            <button type="button" data-copy="<?= e($item['username']) ?>" data-copy-msg="Username copied" style="background: none; border: none; cursor: pointer; color: #94A3B8;">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span id="shared-pass-<?= $idx ?>" class="font-mono" style="font-size: 13px;">••••••••</span>
-                                            <button type="button" onclick="const el = document.getElementById('shared-pass-<?= $idx ?>'); el.textContent = el.textContent === '••••••••' ? '<?= e(addslashes($item['password'])) ?>' : '••••••••';" style="background: none; border: none; cursor: pointer; color: #94A3B8;">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                            </button>
-                                            <button type="button" data-copy="<?= e($item['password']) ?>" data-copy-msg="Password copied" style="background: none; border: none; cursor: pointer; color: #94A3B8;">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td style="text-align: right;">
-                                        <?php if (!empty($item['login_url'])): ?>
-                                            <a href="<?= e($item['login_url']) ?>" target="_blank" class="btn btn-secondary btn-sm" style="color: var(--color-brand-red);">Launch</a>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+
+                <div style="display: grid; gap: 16px; margin-bottom: 24px;">
+                    <div style="background: #F8FAFC; padding: 14px 16px; border-radius: 8px; border: 1px solid #F1F5F9;">
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Username / Account Email</label>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span style="font-size: 15px; font-weight: 600; color: #0F172A; word-break: break-all;"><?= e($item['username'] ?: '—') ?></span>
+                            <?php if (!empty($item['username'])): ?>
+                                <button type="button" data-copy="<?= e($item['username']) ?>" data-copy-msg="Username copied" class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 12px;">Copy</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <div style="background: #F8FAFC; padding: 14px 16px; border-radius: 8px; border: 1px solid #F1F5F9;">
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Password</label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                            <span id="shared-pass-single" class="font-mono" style="font-size: 16px; font-weight: 700; color: #0F172A; letter-spacing: 2px;">••••••••</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" onclick="const el = document.getElementById('shared-pass-single'); el.textContent = el.textContent === '••••••••' ? '<?= e(addslashes($item['password'])) ?>' : '••••••••';" class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 12px;">View / Hide</button>
+                                <button type="button" data-copy="<?= e($item['password']) ?>" data-copy-msg="Password copied" class="btn btn-primary btn-sm" style="padding: 4px 12px; font-size: 12px;">Copy Password</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            <?php endif; ?>
+
+                <?php if (!empty($item['login_url'])): ?>
+                    <a href="<?= e($item['login_url']) ?>" target="_blank" class="btn btn-primary btn-full" style="padding: 12px; font-size: 14px;">Launch Website</a>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
     </div>
 </div>
