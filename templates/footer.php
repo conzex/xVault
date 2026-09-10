@@ -3,13 +3,10 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
 ?>
     <footer class="footer">
         <div class="footer-inner">
-            <div style="display: flex; items-center; justify-content: center; gap: 8px; font-weight: 700; font-size: 16px;">
-                <span style="color: var(--color-brand-black);">x</span><span style="color: var(--color-brand-red);">Vault</span>
-            </div>
             <p>© <?= date('Y') ?> Xvault. All rights reserved.</p>
-            <p class="rainbow-text">
+            <a href="https://www.conzex.com" target="_blank" rel="noopener noreferrer" class="rainbow-text">
                 A Conzex Global Product
-            </p>
+            </a>
         </div>
     </footer>
 </div><!-- .app-container -->
