@@ -786,13 +786,13 @@ async function nextStep() {
         nextBtn.innerText = 'Testing SMTP Connection...';
 
         const payload = {
-            smtp_host: document.getElementById('smtp_host').value.trim() || 'localhost',
-            smtp_port: document.getElementById('smtp_port').value.trim() || '587',
+            smtp_host: document.getElementById('smtp_host').value.trim(),
+            smtp_port: document.getElementById('smtp_port').value.trim(),
             smtp_enc: document.getElementById('smtp_enc').value,
             smtp_user: document.getElementById('smtp_user').value.trim(),
             smtp_pass: document.getElementById('smtp_pass').value,
-            smtp_from_email: document.getElementById('smtp_from_email').value.trim() || 'vault@example.com',
-            smtp_from_name: document.getElementById('smtp_from_name').value.trim() || 'xVault Security'
+            smtp_from_email: document.getElementById('smtp_from_email').value.trim(),
+            smtp_from_name: document.getElementById('smtp_from_name').value.trim()
         };
 
 

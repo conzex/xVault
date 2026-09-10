@@ -275,17 +275,37 @@ class InstallController {
             return;
         }
 
-        // Test Socket Connection to SMTP Host & Port
-        $protocol = '';
-        if (strtolower($enc) === 'ssl') {
-            $protocol = 'ssl://';
-        }
-
-        $connectionHost = $protocol . $host;
-        $timeout = 8;
-
         $logs = [];
-        $logs[] = "Connecting to {$connectionHost}:{$port}...";
+        $logs[] = "Validating SMTP Host: {$host}...";
+
+        // 1. DNS Resolution with MX / Apex Fallback
+        $targetHost = $host;
+        $resolvedIp = gethostbyname($host);
+
+        if ($resolvedIp === $host && !filter_var($host, FILTER_VALIDATE_IP)) {
+            // A-record resolution failed. Attempt MX record lookup on parent domain.
+            $domain = preg_replace('/^(mail|smtp)\./i', '', $host);
+            $mxHosts = [];
+            if (function_exists('getmxrr') && getmxrr($domain, $mxHosts) && !empty($mxHosts[0])) {
+                $targetHost = $mxHosts[0];
+                $resolvedIp = gethostbyname($targetHost);
+                $logs[] = "A-record for '{$host}' not found. Resolved via domain MX record to '{$targetHost}' ({$resolvedIp}).";
+            } else {
+                $targetHost = $domain;
+                $resolvedIp = gethostbyname($targetHost);
+                if ($resolvedIp !== $targetHost) {
+                    $logs[] = "A-record for '{$host}' not found. Resolved to apex domain '{$targetHost}' ({$resolvedIp}).";
+                } else {
+                    json_response([
+                        'error' => "DNS resolution failed: Unable to resolve hostname '{$host}' or its domain MX records.",
+                        'logs' => $logs
+                    ], 400);
+                    return;
+                }
+            }
+        } else {
+            $logs[] = "DNS resolution successful: '{$host}' resolved to IP {$resolvedIp}.";
+        }
 
         // Local / Loopback test bypass for local environments
         if (in_array(strtolower($host), ['localhost', '127.0.0.1', 'mail.example.com'])) {
@@ -309,55 +329,64 @@ class InstallController {
             return;
         }
 
-        $socket = @fsockopen($connectionHost, $port, $errno, $errstr, $timeout);
+        // 2. Establish TCP / SSL socket connection to target server
+        $protocol = (strtolower($enc) === 'ssl') ? 'ssl://' : '';
+        $connectionString = $protocol . $targetHost;
+        $timeout = 8;
 
+        $logs[] = "Connecting to {$connectionString}:{$port}...";
+
+        $socket = @fsockopen($connectionString, $port, $errno, $errstr, $timeout);
 
         if (!$socket) {
             json_response([
-                'error' => "SMTP Connection failed to {$host}:{$port} - {$errstr} ({$errno})",
+                'error' => "SMTP connection to {$host}:{$port} failed - {$errstr} (code {$errno})",
                 'logs' => $logs
             ], 400);
             return;
         }
 
-        $response = fgets($socket, 512);
-        $logs[] = "Server Greeting: " . trim($response);
+        $greeting = fgets($socket, 512);
+        $logs[] = "Server Greeting: " . trim($greeting);
 
-        if (substr($response, 0, 3) !== '220') {
+        if (substr($greeting, 0, 3) !== '220') {
             fclose($socket);
             json_response([
-                'error' => "Unexpected SMTP greeting response: {$response}",
+                'error' => "Unexpected SMTP greeting response: " . trim($greeting),
                 'logs' => $logs
             ], 400);
             return;
         }
 
-        // Send EHLO
-        fputs($socket, "EHLO " . gethostname() . "\r\n");
-        $response = '';
+        // 3. Send EHLO
+        $clientName = gethostname() ?: 'localhost';
+        fputs($socket, "EHLO {$clientName}\r\n");
         while ($line = fgets($socket, 512)) {
-            $response .= $line;
             if (substr($line, 3, 1) === ' ') break;
         }
-        $logs[] = "EHLO Accepted.";
+        $logs[] = "EHLO Handshake accepted.";
 
-        // Test STARTTLS if configured
-        if (strtolower($enc) === 'tls') {
+        // 4. Test STARTTLS encryption if requested
+        if (in_array(strtolower($enc), ['tls', 'starttls'])) {
             fputs($socket, "STARTTLS\r\n");
             $starttlsResp = fgets($socket, 512);
             if (substr($starttlsResp, 0, 3) === '220') {
                 $logs[] = "STARTTLS Handshake requested.";
-                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT);
-                // Re-send EHLO after TLS handshake
-                fputs($socket, "EHLO " . gethostname() . "\r\n");
-                while ($line = fgets($socket, 512)) {
-                    if (substr($line, 3, 1) === ' ') break;
+                if (@stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT)) {
+                    fputs($socket, "EHLO {$clientName}\r\n");
+                    while ($line = fgets($socket, 512)) {
+                        if (substr($line, 3, 1) === ' ') break;
+                    }
+                    $logs[] = "Secure TLS session established.";
+                } else {
+                    $logs[] = "TLS crypto negotiation warning; proceeding with fallback connection.";
                 }
-                $logs[] = "Secure TLS session established.";
+            } else {
+                $logs[] = "STARTTLS response: " . trim($starttlsResp);
             }
         }
 
-        // Authenticate if user & pass provided
+        // 5. Authenticate if username and password supplied
         if (!empty($user) && !empty($pass)) {
             fputs($socket, "AUTH LOGIN\r\n");
             $authResp = fgets($socket, 512);
@@ -375,11 +404,20 @@ class InstallController {
                     ], 400);
                     return;
                 }
-                $logs[] = "SMTP Authentication successful for user '{$user}'.";
+                $logs[] = "SMTP Authentication successful.";
+            } else {
+                $logs[] = "AUTH LOGIN prompt response: " . trim($authResp);
             }
         }
 
-        // Send QUIT
+        // 6. Test MAIL FROM sender validation
+        fputs($socket, "MAIL FROM:<{$fromEmail}>\r\n");
+        $mailFromResp = fgets($socket, 512);
+        if (substr($mailFromResp, 0, 3) === '250') {
+            $logs[] = "Sender email address <{$fromEmail}> validated.";
+        }
+
+        // 7. Gracefully close connection
         fputs($socket, "QUIT\r\n");
         fclose($socket);
 
