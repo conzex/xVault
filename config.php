@@ -15,10 +15,7 @@ define('APP_NAME', 'xVault');
 define('APP_VERSION', '1.0.0');
 
 // Domain / Base URL configuration
-$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-define('APP_URL', getenv('APP_URL') ?: ($protocol . '://' . $host . ($scriptDir ? $scriptDir : '')));
+define('APP_URL', getenv('APP_URL') !== false ? getenv('APP_URL') : '');
 
 // Database Configuration (Default: SQLite for zero-config fallback, or MySQL for cPanel)
 define('DB_DRIVER', getenv('DB_DRIVER') ?: 'sqlite'); // 'sqlite' or 'mysql'

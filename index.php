@@ -24,6 +24,14 @@ init_session();
 // Parse Request URI
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// Serve static files directly when using PHP CLI built-in server
+if (php_sapi_name() === 'cli-server') {
+    $filePath = __DIR__ . $requestUri;
+    if ($requestUri !== '/' && is_file($filePath)) {
+        return false;
+    }
+}
+
 // Strip base directory if app is installed in subfolder
 $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
 $baseDir = rtrim(dirname($scriptName), '/\\');
