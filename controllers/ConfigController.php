@@ -239,37 +239,66 @@ class ConfigController {
             json_response(['error' => 'SMTP Host and From Email are required when SMTP is enabled.'], 400);
         }
 
-        $configPath = __DIR__ . '/../config.php';
-        if (!file_exists($configPath)) {
-            json_response(['error' => 'Configuration file not found.'], 500);
+        // 1. Save to Database system_settings
+        try {
+            $db = getDB();
+            $settingsToSave = [
+                'smtp_enabled' => $enabled ? 'true' : 'false',
+                'smtp_host' => $host,
+                'smtp_port' => (string)$port,
+                'smtp_user' => $user,
+                'smtp_pass' => $pass,
+                'smtp_enc' => $enc,
+                'smtp_from_email' => $fromEmail,
+                'smtp_from_name' => $fromName
+            ];
+
+            foreach ($settingsToSave as $k => $v) {
+                if (DB_DRIVER === 'sqlite') {
+                    $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
+                } else {
+                    $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+                }
+                $stmt->execute([$k, $v]);
+            }
+        } catch (\Throwable $e) {
+            error_log("DB updateSettings warning: " . $e->getMessage());
         }
 
-        $configStr = file_get_contents($configPath);
-
-        $configStr = preg_replace("/define\('SMTP_ENABLED',\s*[^)]+\);/", "define('SMTP_ENABLED', " . var_export($enabled, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_HOST',\s*[^)]+\);/", "define('SMTP_HOST', " . var_export($host, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_PORT',\s*[^)]+\);/", "define('SMTP_PORT', {$port});", $configStr);
-        $configStr = preg_replace("/define\('SMTP_USER',\s*[^)]+\);/", "define('SMTP_USER', " . var_export($user, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_PASS',\s*[^)]+\);/", "define('SMTP_PASS', " . var_export($pass, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_ENCRYPTION',\s*[^)]+\);/", "define('SMTP_ENCRYPTION', " . var_export($enc, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_FROM_EMAIL',\s*[^)]+\);/", "define('SMTP_FROM_EMAIL', " . var_export($fromEmail, true) . ");", $configStr);
-        $configStr = preg_replace("/define\('SMTP_FROM_NAME',\s*[^)]+\);/", "define('SMTP_FROM_NAME', " . var_export($fromName, true) . ");", $configStr);
-
-        file_put_contents($configPath, $configStr);
+        // 2. Sync to config.php file
+        $configPath = __DIR__ . '/../config.php';
+        if (file_exists($configPath)) {
+            $configStr = file_get_contents($configPath);
+            $configStr = preg_replace("/define\('SMTP_ENABLED',\s*[^)]+\);/", "define('SMTP_ENABLED', " . var_export($enabled, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_HOST',\s*[^)]+\);/", "define('SMTP_HOST', " . var_export($host, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_PORT',\s*[^)]+\);/", "define('SMTP_PORT', {$port});", $configStr);
+            $configStr = preg_replace("/define\('SMTP_USER',\s*[^)]+\);/", "define('SMTP_USER', " . var_export($user, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_PASS',\s*[^)]+\);/", "define('SMTP_PASS', " . var_export($pass, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_ENCRYPTION',\s*[^)]+\);/", "define('SMTP_ENCRYPTION', " . var_export($enc, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_FROM_EMAIL',\s*[^)]+\);/", "define('SMTP_FROM_EMAIL', " . var_export($fromEmail, true) . ");", $configStr);
+            $configStr = preg_replace("/define\('SMTP_FROM_NAME',\s*[^)]+\);/", "define('SMTP_FROM_NAME', " . var_export($fromName, true) . ");", $configStr);
+            @file_put_contents($configPath, $configStr);
+        }
 
         log_security_event('PLATFORM_CONFIG_UPDATED', "Platform Configuration updated by Super Admin");
 
-        $testSent = false;
+        // 3. Test SMTP connection if test email provided
+        $testResult = null;
         if ($enabled && !empty($testEmail)) {
-            $testBody = "<p>This is a live test email sent from your xVault Platform Configuration dashboard.</p>" .
-                        "<p>If you are receiving this message, your SMTP mailer settings are configured and operating correctly.</p>";
-            $testSent = send_user_transactional_email($testEmail, 'xVault SMTP Test Delivery', 'SMTP Mailer Operational', $testBody, get_app_url('/config'), 'Open Configuration Dashboard', 'This is an automated test message.');
+            $testResult = test_smtp_connection($testEmail);
+            if (!$testResult['success']) {
+                json_response([
+                    'success' => false,
+                    'error' => $testResult['message'],
+                    'status' => $testResult['status']
+                ], 400);
+            }
         }
 
         json_response([
             'success' => true,
-            'message' => $testSent ? 'Platform settings saved and test email sent successfully!' : 'Platform settings updated successfully.',
-            'test_sent' => $testSent
+            'message' => ($testResult && $testResult['success']) ? $testResult['message'] : 'Platform settings updated successfully.',
+            'test_sent' => !empty($testResult['success'])
         ]);
     }
 }

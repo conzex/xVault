@@ -113,8 +113,8 @@ if ($currentUser) {
         </a>
         <?php endif; ?>
     </nav>
-
 </aside>
+<div class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
 
 <script>
 function toggleAddMenu(e) {
@@ -134,4 +134,3 @@ window.addEventListener('click', function(e) {
     }
 });
 </script>
-

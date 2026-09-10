@@ -339,6 +339,144 @@ function render_email_template($title, $bodyHtml, $ctaUrl = null, $ctaText = nul
 }
 
 /**
+ * Dynamic SMTP Configuration Loader
+ * Reads stored SMTP settings from database system_settings table with fallback to config.php
+ */
+function get_smtp_config() {
+    try {
+        $db = getDB();
+        $stmt = $db->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'smtp_%'");
+        $dbSettings = $stmt ? $stmt->fetchAll(PDO::FETCH_KEY_PAIR) : [];
+    } catch (\Throwable $e) {
+        $dbSettings = [];
+    }
+
+    $enabled = isset($dbSettings['smtp_enabled'])
+        ? filter_var($dbSettings['smtp_enabled'], FILTER_VALIDATE_BOOLEAN)
+        : (defined('SMTP_ENABLED') ? filter_var(SMTP_ENABLED, FILTER_VALIDATE_BOOLEAN) : false);
+
+    $host = $dbSettings['smtp_host'] ?? (defined('SMTP_HOST') ? SMTP_HOST : '');
+    $port = isset($dbSettings['smtp_port']) ? (int)$dbSettings['smtp_port'] : (defined('SMTP_PORT') ? (int)SMTP_PORT : 587);
+    $user = $dbSettings['smtp_user'] ?? (defined('SMTP_USER') ? SMTP_USER : '');
+    $pass = $dbSettings['smtp_pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : '');
+    $enc = $dbSettings['smtp_enc'] ?? $dbSettings['smtp_encryption'] ?? (defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : 'tls');
+    $fromEmail = $dbSettings['smtp_from_email'] ?? (defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : '');
+    $fromName = $dbSettings['smtp_from_name'] ?? (defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'xVault Security');
+
+    return [
+        'enabled' => $enabled,
+        'host' => $host,
+        'port' => $port,
+        'user' => $user,
+        'pass' => $pass,
+        'encryption' => $enc,
+        'from_email' => $fromEmail,
+        'from_name' => $fromName
+    ];
+}
+
+/**
+ * Deep Socket & Authentication Test for SMTP Server
+ */
+function test_smtp_connection($testEmail = null) {
+    $cfg = get_smtp_config();
+
+    if (empty($cfg['host']) || empty($cfg['from_email'])) {
+        return [
+            'success' => false,
+            'status' => 'not_configured',
+            'message' => 'SMTP Host and From Email must be configured.'
+        ];
+    }
+
+    $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
+    $host = $cfg['host'];
+    $port = $cfg['port'];
+
+    $socket = @fsockopen($protocol . $host, $port, $errno, $errstr, 8);
+    if (!$socket) {
+        return [
+            'success' => false,
+            'status' => 'connection_failed',
+            'message' => "SMTP Connection failed to {$host}:{$port} - {$errstr} ({$errno})"
+        ];
+    }
+
+    fgets($socket, 512);
+    $clientHost = gethostname() ?: 'localhost';
+    fputs($socket, "EHLO {$clientHost}\r\n");
+    while ($line = fgets($socket, 512)) {
+        if (substr($line, 3, 1) === ' ') break;
+    }
+
+    $enc = strtolower($cfg['encryption']);
+    if (in_array($enc, ['tls', 'starttls'])) {
+        fputs($socket, "STARTTLS\r\n");
+        $resp = fgets($socket, 512);
+        if (substr($resp, 0, 3) === '220') {
+            $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT);
+            if (!$cryptoOk) {
+                fclose($socket);
+                return [
+                    'success' => false,
+                    'status' => 'tls_failed',
+                    'message' => 'TLS/SSL handshake negotiation failed.'
+                ];
+            }
+            fputs($socket, "EHLO {$clientHost}\r\n");
+            while ($line = fgets($socket, 512)) {
+                if (substr($line, 3, 1) === ' ') break;
+            }
+        }
+    }
+
+    if (!empty($cfg['user']) && !empty($cfg['pass'])) {
+        fputs($socket, "AUTH LOGIN\r\n");
+        fgets($socket, 512);
+        fputs($socket, base64_encode($cfg['user']) . "\r\n");
+        fgets($socket, 512);
+        fputs($socket, base64_encode($cfg['pass']) . "\r\n");
+        $authRes = fgets($socket, 512);
+        if (substr($authRes, 0, 3) !== '235') {
+            fclose($socket);
+            return [
+                'success' => false,
+                'status' => 'auth_failed',
+                'message' => 'SMTP Authentication failed: ' . trim($authRes)
+            ];
+        }
+    }
+
+    if (!empty($testEmail) && filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
+        $body = render_email_template('SMTP Diagnostic Test', '<p>This is a live test email sent from xVault Configuration System.</p>', get_app_url('/config'), 'Open Configuration', 'Your SMTP server is configured and connected successfully.');
+        fputs($socket, "MAIL FROM:<{$cfg['from_email']}>\r\n");
+        fgets($socket, 512);
+        fputs($socket, "RCPT TO:<{$testEmail}>\r\n");
+        fgets($socket, 512);
+        fputs($socket, "DATA\r\n");
+        fgets($socket, 512);
+        $headersStr = "MIME-Version: 1.0\r\n" .
+                      "Content-Type: text/html; charset=UTF-8\r\n" .
+                      "From: {$cfg['from_name']} <{$cfg['from_email']}>\r\n" .
+                      "To: {$testEmail}\r\n" .
+                      "Subject: xVault SMTP Connectivity Test\r\n" .
+                      "Date: " . date('r') . "\r\n\r\n";
+        fputs($socket, $headersStr . $body . "\r\n.\r\n");
+        fgets($socket, 512);
+        log_email_delivery($testEmail, 'xVault SMTP Connectivity Test', 'test', 'sent');
+    }
+
+    fputs($socket, "QUIT\r\n");
+    fclose($socket);
+
+    return [
+        'success' => true,
+        'status' => 'success',
+        'message' => !empty($testEmail) ? "SMTP connection, authentication, and test email delivery to {$testEmail} succeeded!" : "SMTP connection and authentication verified successfully!"
+    ];
+}
+
+/**
  * Send Transactional Email with SMTP Check
  */
 function send_app_email($toEmail, $subject, $htmlBody) {
@@ -347,18 +485,20 @@ function send_app_email($toEmail, $subject, $htmlBody) {
         return false;
     }
 
+    $cfg = get_smtp_config();
+
     // Check if SMTP is enabled & configured
-    if (!defined('SMTP_ENABLED') || !SMTP_ENABLED || !defined('SMTP_HOST') || empty(SMTP_HOST)) {
+    if (!$cfg['enabled'] || empty($cfg['host'])) {
         error_log("SMTP disabled: Email sending to {$toEmail} skipped.");
         log_email_delivery($toEmail, $subject, 'transactional', 'failed', 'SMTP is not enabled or configured in application settings');
         return false;
     }
 
-    $fromName = defined('SMTP_FROM_NAME') && !empty(SMTP_FROM_NAME) ? SMTP_FROM_NAME : 'xVault Security';
-    $fromEmail = defined('SMTP_FROM_EMAIL') && !empty(SMTP_FROM_EMAIL) ? SMTP_FROM_EMAIL : 'vault@' . (parse_url(get_app_url(), PHP_URL_HOST) ?: 'localhost');
+    $fromName = !empty($cfg['from_name']) ? $cfg['from_name'] : 'xVault Security';
+    $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : 'vault@' . (parse_url(get_app_url(), PHP_URL_HOST) ?: 'localhost');
 
     // Local / Sendmail mode
-    if (in_array(strtolower(SMTP_HOST), ['localhost', '127.0.0.1'])) {
+    if (in_array(strtolower($cfg['host']), ['localhost', '127.0.0.1'])) {
         $headers = [
             'MIME-Version: 1.0',
             'Content-type: text/html; charset=utf-8',
@@ -373,9 +513,9 @@ function send_app_email($toEmail, $subject, $htmlBody) {
 
     // TCP Socket SMTP Delivery
     try {
-        $protocol = (defined('SMTP_ENCRYPTION') && strtolower(SMTP_ENCRYPTION) === 'ssl') ? 'ssl://' : '';
-        $targetHost = SMTP_HOST;
-        $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 587;
+        $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
+        $targetHost = $cfg['host'];
+        $port = (int)$cfg['port'];
 
         $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
         if (!$socket) {
@@ -391,7 +531,7 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             if (substr($line, 3, 1) === ' ') break;
         }
 
-        $enc = defined('SMTP_ENCRYPTION') ? strtolower(SMTP_ENCRYPTION) : 'tls';
+        $enc = strtolower($cfg['encryption']);
         if (in_array($enc, ['tls', 'starttls'])) {
             fputs($socket, "STARTTLS\r\n");
             $resp = fgets($socket, 512);
@@ -404,16 +544,16 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             }
         }
 
-        if (defined('SMTP_USER') && !empty(SMTP_USER) && defined('SMTP_PASS') && !empty(SMTP_PASS)) {
+        if (!empty($cfg['user']) && !empty($cfg['pass'])) {
             fputs($socket, "AUTH LOGIN\r\n");
             fgets($socket, 512);
-            fputs($socket, base64_encode(SMTP_USER) . "\r\n");
+            fputs($socket, base64_encode($cfg['user']) . "\r\n");
             fgets($socket, 512);
-            fputs($socket, base64_encode(SMTP_PASS) . "\r\n");
+            fputs($socket, base64_encode($cfg['pass']) . "\r\n");
             $authRes = fgets($socket, 512);
             if (substr($authRes, 0, 3) !== '235') {
                 fclose($socket);
-                error_log("SMTP Auth failed for user " . SMTP_USER);
+                error_log("SMTP Auth failed for user " . $cfg['user']);
                 log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP Authentication failed: " . trim($authRes));
                 return false;
             }
