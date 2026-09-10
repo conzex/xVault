@@ -4,57 +4,44 @@
  * Production Configuration
  */
 
-// Prevent direct file access
 if (!defined('XVAULT_EXEC')) {
     define('XVAULT_EXEC', true);
 }
 
-// Application Environment ('production' or 'development')
-define('APP_ENV', getenv('APP_ENV') ?: 'production');
+define('APP_ENV', 'production');
 define('APP_NAME', 'xVault');
 define('APP_VERSION', '1.0.0');
+define('APP_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
 
-// Domain / Base URL configuration
-define('APP_URL', getenv('APP_URL') !== false ? getenv('APP_URL') : '');
-
-// Database Configuration (Default: SQLite for zero-config fallback, or MySQL for cPanel)
-define('DB_DRIVER', getenv('DB_DRIVER') ?: 'sqlite'); // 'sqlite' or 'mysql'
-
-// MySQL Settings (used if DB_DRIVER === 'mysql')
-define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
-define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'xvault');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+// Database Configuration
+define('DB_DRIVER', 'sqlite');
+define('DB_HOST', '127.0.0.1');
+define('DB_PORT', 3306);
+define('DB_NAME', 'xvault');
+define('DB_USER', 'root');
+define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
-// SQLite Settings (used if DB_DRIVER === 'sqlite')
+// SQLite Settings
 define('SQLITE_FILE', __DIR__ . '/storage/xvault.db');
 
-// Security & Encryption Key (Must be 32 bytes / 64 hex characters in production)
-$secretKey = getenv('CRYPTO_SECRET') ?: 'c8a2e5d9f1b4a3c7e0d6f2a8b4c1e5f9d2a6b0c4e8f1a3b5c7d9e1f2a4b6c8d0';
-define('CRYPTO_SECRET', $secretKey);
+// Security & Encryption Secret Key
+define('CRYPTO_SECRET', 'f4fa9c0916fa3df85516da63bba2bf92baade26df9211b64f133e29ac0329c93');
 
-// SMTP Mailer Configuration
-define('SMTP_HOST', getenv('SMTP_HOST') ?: '');
-define('SMTP_PORT', getenv('SMTP_PORT') ?: '587');
-define('SMTP_USER', getenv('SMTP_USER') ?: '');
-define('SMTP_PASS', getenv('SMTP_PASS') ?: '');
-define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: 'no-reply@xvault.local');
-define('SMTP_FROM_NAME', getenv('SMTP_FROM_NAME') ?: 'xVault Security');
+// SMTP Configuration
+define('SMTP_HOST', '127.0.0.1');
+define('SMTP_PORT', 587);
+define('SMTP_USER', 'smtp@conzex.com');
+define('SMTP_PASS', 'pass');
+define('SMTP_ENCRYPTION', 'tls');
+define('SMTP_FROM_EMAIL', 'vault@conzex.com');
+define('SMTP_FROM_NAME', 'xVault Security');
+define('SMTP_REPLY_TO', 'vault@conzex.com');
 
-// Error Handling Configuration
-if (APP_ENV === 'production') {
-    ini_set('display_errors', '0');
-    ini_set('display_startup_errors', '0');
-    error_reporting(E_ALL & ~E_DEPRECATED);
-} else {
-    ini_set('display_errors', '1');
-    ini_set('display_startup_errors', '1');
-    error_reporting(E_ALL);
-}
-
-// Error Logger
+// Production Error Logging
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL & ~E_DEPRECATED);
 ini_set('log_errors', '1');
 $logDir = __DIR__ . '/storage/logs';
 if (!is_dir($logDir)) {

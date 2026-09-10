@@ -81,9 +81,5 @@ if ($currentUser) {
         <?php endif; ?>
     </nav>
 
-    <div style="margin: 0 16px; padding: 16px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 12px;">
-        <p style="font-size: 12px; font-weight: 800; color: var(--color-brand-red); margin-bottom: 4px;">Enterprise Protection</p>
-        <p style="font-size: 11px; color: #B71C1C; line-height: 1.4; margin-bottom: 12px;">Active zero-knowledge encryption enabled for all vault entries.</p>
-        <button type="button" class="btn btn-secondary btn-sm btn-full" style="font-size: 11px; font-weight: 700; color: var(--color-brand-red); border-color: #FFCDD2;" onclick="openPasswordGenerator()">GENERATE PASSWORDS</button>
-    </div>
 </aside>
+

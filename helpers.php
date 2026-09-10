@@ -258,3 +258,11 @@ function log_security_event($eventType, $details = null, $userId = null) {
         error_log("Security log write exception: " . $e->getMessage());
     }
 }
+
+/**
+ * Check if application installation has been completed & locked
+ */
+function is_installed() {
+    return file_exists(__DIR__ . '/storage/installed.lock');
+}
+

@@ -3,16 +3,19 @@
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'user',
     name VARCHAR(255) NULL,
+    status VARCHAR(50) DEFAULT 'active',
     is_verified TINYINT(1) DEFAULT 0,
     verification_token VARCHAR(255) NULL,
     reset_token VARCHAR(255) NULL,
     reset_token_expiry DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE IF NOT EXISTS folders (
     id INT AUTO_INCREMENT PRIMARY KEY,

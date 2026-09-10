@@ -18,6 +18,7 @@ require_once __DIR__ . '/controllers/AddressController.php';
 require_once __DIR__ . '/controllers/NoteController.php';
 require_once __DIR__ . '/controllers/ShareController.php';
 require_once __DIR__ . '/controllers/SecurityController.php';
+require_once __DIR__ . '/controllers/InstallController.php';
 
 // Start or resume session
 init_session();
@@ -41,6 +42,28 @@ if ($baseDir !== '' && strpos($requestUri, $baseDir) === 0) {
 }
 $path = '/' . trim($requestUri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
+
+// First-Time Installation Enforcer
+if (!is_installed()) {
+    if (strpos($path, '/api/install/') === 0) {
+        $action = str_replace('-', '_', str_replace('/api/install/', 'api_', $path));
+        InstallController::handleRequest($action);
+        exit;
+    } elseif ($path === '/install') {
+
+        InstallController::handleRequest('wizard');
+        exit;
+    } else {
+        header('Location: ' . APP_URL . '/install');
+        exit;
+    }
+} else {
+    if ($path === '/install') {
+        InstallController::handleRequest('locked');
+        exit;
+    }
+}
+
 
 // CSRF Validation for POST/PUT/DELETE API endpoints
 if (in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH']) && strpos($path, '/api/') === 0) {
