@@ -441,10 +441,10 @@ button, input, select, textarea {
   background: var(--color-brand-red-hover);
 }
 
-/* Centralized Bottom-Right Toast Notifications ONLY */
+/* Centralized Bottom-Right Toast Notifications (Positioned above FAB button without overlap) */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  bottom: 96px;
   right: 24px;
   z-index: 9999;
   display: flex;
@@ -459,16 +459,17 @@ button, input, select, textarea {
   min-width: 280px;
   padding: 14px 18px;
   border-radius: 10px;
-  background: #0F172A;
-  color: #ffffff;
+  background: #FFFFFF;
+  color: #0F172A;
   font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   animation: slideInBottomRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid #E2E8F0;
   border-left: 4px solid #3B82F6;
 }
 
@@ -485,7 +486,8 @@ button, input, select, textarea {
   cursor: pointer;
   padding: 0 4px;
 }
-.toast-close:hover { color: #ffffff; }
+.toast-close:hover { color: #0F172A; }
+
 
 @keyframes slideInBottomRight {
   from { transform: translateY(100%); opacity: 0; }

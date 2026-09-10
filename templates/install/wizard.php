@@ -10,8 +10,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/main.css">
     <style>
         body {
-            background-color: #0F172A;
-            color: #F8FAFC;
+            background-color: #F8FAFC;
+            color: #1E293B;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -22,10 +22,10 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .installer-card {
-            background: #1E293B;
-            border: 1px solid #334155;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
             border-radius: 16px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
             width: 100%;
             max-width: 900px;
             overflow: hidden;
@@ -34,9 +34,9 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .installer-header {
-            background: #0F172A;
+            background: #FFFFFF;
             padding: 24px 32px;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #E2E8F0;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -56,21 +56,21 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             font-size: 20px;
             font-weight: 800;
             margin: 0;
-            color: #FFFFFF;
+            color: #0F172A;
         }
 
         .installer-brand p {
             font-size: 12px;
-            color: #94A3B8;
+            color: #64748B;
             margin: 0;
         }
 
-        /* Responsive Horizontal Step Timeline */
+        /* Responsive Horizontal Step Timeline - Light Theme */
         .wizard-timeline {
             display: flex;
-            background: #0F172A;
+            background: #F8FAFC;
             padding: 16px 24px;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #E2E8F0;
             overflow-x: auto;
             scrollbar-width: thin;
         }
@@ -98,8 +98,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            background: #334155;
-            color: #94A3B8;
+            background: #E2E8F0;
+            color: #64748B;
             font-weight: 700;
             font-size: 12px;
             display: flex;
@@ -111,7 +111,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .timeline-step.active .step-number {
             background: var(--color-brand-red, #D32F2F);
             color: #FFFFFF;
-            box-shadow: 0 0 10px rgba(211, 47, 47, 0.5);
+            box-shadow: 0 0 10px rgba(211, 47, 47, 0.3);
         }
 
         .timeline-step.completed .step-number {
@@ -122,18 +122,19 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .step-label {
             font-size: 11px;
             font-weight: 600;
-            color: #CBD5E1;
+            color: #64748B;
             white-space: nowrap;
         }
 
         .timeline-step.active .step-label {
-            color: #FFFFFF;
+            color: #0F172A;
             font-weight: 700;
         }
 
         .installer-body {
             padding: 32px;
             min-height: 380px;
+            background: #FFFFFF;
         }
 
         .wizard-page {
@@ -147,13 +148,13 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .step-title {
             font-size: 18px;
             font-weight: 700;
-            color: #FFFFFF;
+            color: #0F172A;
             margin-bottom: 8px;
         }
 
         .step-desc {
             font-size: 13px;
-            color: #94A3B8;
+            color: #64748B;
             margin-bottom: 24px;
         }
 
@@ -171,17 +172,17 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             display: block;
             font-size: 12px;
             font-weight: 600;
-            color: #CBD5E1;
+            color: #475569;
             margin-bottom: 6px;
         }
 
         .installer-card input, .installer-card select {
             width: 100%;
-            background: #0F172A;
-            border: 1px solid #334155;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
             border-radius: 8px;
             padding: 10px 14px;
-            color: #FFFFFF;
+            color: #0F172A;
             font-size: 13px;
             box-sizing: border-box;
         }
@@ -189,18 +190,20 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .installer-card input:focus, .installer-card select:focus {
             outline: none;
             border-color: var(--color-brand-red, #D32F2F);
-            box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.2);
+            box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.15);
         }
 
         .check-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #0F172A;
+            background: #F8FAFC;
             padding: 12px 16px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #E2E8F0;
             margin-bottom: 10px;
+            color: #334155;
+            font-size: 13px;
         }
 
         .badge-status {
@@ -211,18 +214,18 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .badge-pass {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34D399;
+            background: #D1FAE5;
+            color: #065F46;
         }
 
         .badge-fail {
-            background: rgba(239, 68, 68, 0.2);
-            color: #F87171;
+            background: #FEE2E2;
+            color: #991B1B;
         }
 
         .warning-box {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid #EF4444;
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
             border-radius: 10px;
             padding: 16px;
             margin-top: 16px;
@@ -230,7 +233,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
 
         .warning-box h4 {
             margin: 0 0 8px 0;
-            color: #FCA5A5;
+            color: #991B1B;
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -240,7 +243,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .warning-box p {
             margin: 0 0 12px 0;
             font-size: 12px;
-            color: #FEE2E2;
+            color: #7F1D1D;
             line-height: 1.5;
         }
 
@@ -259,13 +262,13 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         .confirm-checkbox span {
             font-size: 12px;
             font-weight: 600;
-            color: #FFFFFF;
+            color: #0F172A;
         }
 
         .installer-footer {
-            background: #0F172A;
+            background: #F8FAFC;
             padding: 16px 32px;
-            border-top: 1px solid #334155;
+            border-top: 1px solid #E2E8F0;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -293,9 +296,9 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .btn-back {
-            background: transparent;
-            color: #94A3B8;
-            border: 1px solid #334155;
+            background: #FFFFFF;
+            color: #475569;
+            border: 1px solid #CBD5E1;
             border-radius: 8px;
             padding: 10px 20px;
             font-size: 13px;
@@ -304,18 +307,18 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .btn-back:hover {
-            color: #FFFFFF;
-            border-color: #475569;
+            color: #0F172A;
+            border-color: #94A3B8;
         }
 
         .log-terminal {
-            background: #020617;
-            border: 1px solid #1E293B;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
             border-radius: 8px;
             padding: 12px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: #38BDF8;
+            font-size: 12px;
+            color: #0284C7;
             max-height: 140px;
             overflow-y: auto;
             margin-top: 16px;
@@ -345,7 +348,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 <p>Enterprise Setup Wizard</p>
             </div>
         </div>
-        <div style="font-size: 11px; font-weight: 700; background: #334155; padding: 4px 10px; border-radius: 20px; color: #94A3B8;">
+        <div style="font-size: 11px; font-weight: 700; background: #F1F5F9; padding: 4px 10px; border-radius: 20px; color: #64748B;">
             v1.0.0
         </div>
     </div>
@@ -432,7 +435,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="step-desc">Testing database connection and checking for pre-existing tables.</div>
 
             <div id="db-auth-status" style="margin-bottom: 16px;">
-                <div style="background: #0F172A; padding: 16px; border-radius: 8px; border: 1px solid #334155; font-size: 13px; color: #CBD5E1;">
+                <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; font-size: 13px; color: #475569;">
                     Ready to authenticate database credentials...
                 </div>
             </div>
@@ -534,7 +537,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="step-desc">Performing socket connection and credential authentication with configured SMTP server.</div>
 
             <div id="smtp-test-status">
-                <div style="background: #0F172A; padding: 16px; border-radius: 8px; border: 1px solid #334155; font-size: 13px; color: #CBD5E1;">
+                <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; font-size: 13px; color: #475569;">
                     Click "Run SMTP Test" to verify email server connection...
                 </div>
             </div>
@@ -552,8 +555,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
-                <h3 style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0; color: #FFFFFF;">Ready to Install xVault</h3>
-                <p style="font-size: 13px; color: #94A3B8; max-width: 500px; margin: 0 auto 24px auto;">
+                <h3 style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0; color: #0F172A;">Ready to Install xVault</h3>
+                <p style="font-size: 13px; color: #64748B; max-width: 500px; margin: 0 auto 24px auto;">
                     All requirements and configuration steps have been validated. Click "Complete Installation" to finalize xVault setup.
                 </p>
             </div>
@@ -699,12 +702,12 @@ async function nextStep() {
             const warnBox = document.getElementById('db-overwrite-warning');
 
             if (data.existing_tables) {
-                statusBox.innerHTML = `<div style="background: rgba(234, 179, 8, 0.15); border: 1px solid #EAB308; padding: 14px; border-radius: 8px; font-size: 13px; color: #FEF08A;">
+                statusBox.innerHTML = `<div style="background: #FEF9C3; border: 1px solid #FDE047; padding: 14px; border-radius: 8px; font-size: 13px; color: #854D0E;">
                     ✓ Database connection authenticated successfully. System detected <strong>${data.existing_count} existing tables</strong>.
                 </div>`;
                 warnBox.style.display = 'block';
             } else {
-                statusBox.innerHTML = `<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; padding: 14px; border-radius: 8px; font-size: 13px; color: #6EE7B7;">
+                statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46;">
                     ✓ Database connection authenticated successfully. Target database is clean and ready.
                 </div>`;
                 warnBox.style.display = 'none';
@@ -805,7 +808,7 @@ async function nextStep() {
             }
 
             if (!res.ok || !data.success) {
-                statusBox.innerHTML = `<div style="background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; padding: 14px; border-radius: 8px; font-size: 13px; color: #FCA5A5;">
+                statusBox.innerHTML = `<div style="background: #FEE2E2; border: 1px solid #FCA5A5; padding: 14px; border-radius: 8px; font-size: 13px; color: #991B1B;">
                     ✕ ${escapeHtml(data.error || 'SMTP Test Failed')}
                 </div>`;
                 toast.error(data.error || 'SMTP Connection Test Failed');
@@ -814,7 +817,7 @@ async function nextStep() {
                 return;
             }
 
-            statusBox.innerHTML = `<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; padding: 14px; border-radius: 8px; font-size: 13px; color: #6EE7B7;">
+            statusBox.innerHTML = `<div style="background: #D1FAE5; border: 1px solid #6EE7B7; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46;">
                 ✓ SMTP server authentication test passed successfully!
             </div>`;
             toast.success('SMTP Server Authentication Passed!');

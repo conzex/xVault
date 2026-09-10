@@ -10,8 +10,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/main.css">
     <style>
         body {
-            background-color: #0F172A;
-            color: #F8FAFC;
+            background-color: #F8FAFC;
+            color: #1E293B;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -22,10 +22,10 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
         }
 
         .locked-card {
-            background: #1E293B;
-            border: 1px solid #334155;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
             border-radius: 16px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
             width: 100%;
             max-width: 540px;
             padding: 40px 32px;
@@ -36,8 +36,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             width: 64px;
             height: 64px;
             border-radius: 50%;
-            background: rgba(239, 68, 68, 0.15);
-            color: #EF4444;
+            background: #FEE2E2;
+            color: #DC2626;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -48,12 +48,12 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             font-size: 22px;
             font-weight: 800;
             margin: 0 0 10px 0;
-            color: #FFFFFF;
+            color: #0F172A;
         }
 
         .locked-card p {
             font-size: 14px;
-            color: #94A3B8;
+            color: #64748B;
             line-height: 1.6;
             margin: 0 0 28px 0;
         }
