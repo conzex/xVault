@@ -351,17 +351,27 @@ class InstallController {
         $connectionString = $protocol . $targetHost;
         $timeout = 8;
 
-        $logs[] = "Connecting to {$connectionString}:{$port}...";
-
         $socket = @fsockopen($connectionString, $port, $errno, $errstr, $timeout);
 
         if (!$socket) {
+            $tip = "";
+            if (!in_array((int)$port, [587, 465, 25])) {
+                $tip .= " Note: Port {$port} is non-standard. Standard SMTP ports are 587 (TLS/STARTTLS), 465 (SSL), or 25.";
+            }
+            if ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
+                $tip .= " Connection timed out (server unreachable or blocked by firewall). You can edit settings to fix the port or click 'Skip SMTP Setup' to proceed without email.";
+            } elseif ($errno === 111 || strpos(strtolower($errstr), 'refused') !== false) {
+                $tip .= " Connection refused by target server.";
+            }
+            $errDetail = "SMTP connection to {$host}:{$port} failed - {$errstr} (code {$errno})." . $tip;
+            $logs[] = "ERROR: " . $errDetail;
             json_response([
-                'error' => "SMTP connection to {$host}:{$port} failed - {$errstr} (code {$errno})",
+                'error' => $errDetail,
                 'logs' => $logs
             ], 400);
             return;
         }
+        stream_set_timeout($socket, 8);
 
         $greeting = fgets($socket, 512);
         $logs[] = "Server Greeting: " . trim($greeting);

@@ -440,12 +440,19 @@ function test_smtp_connection($testEmail = null) {
 
     $socket = @fsockopen($protocol . $host, $port, $errno, $errstr, 8);
     if (!$socket) {
+        $tip = "";
+        if ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
+            $tip = " (Connection timed out. Check if port {$port} is open and correct on your mail server. Standard SMTP ports are 587 for TLS/STARTTLS, 465 for SSL, or 25 for plain text.)";
+        } elseif ($errno === 111 || strpos(strtolower($errstr), 'refused') !== false) {
+            $tip = " (Connection refused on port {$port}. Verify SMTP server status.)";
+        }
         return [
             'success' => false,
             'status' => 'connection_failed',
-            'message' => "SMTP Connection failed to {$host}:{$port} - {$errstr} ({$errno})"
+            'message' => "SMTP Connection failed to {$host}:{$port} - {$errstr} (code {$errno})" . $tip
         ];
     }
+    stream_set_timeout($socket, 8);
 
     fgets($socket, 512);
     $clientHost = gethostname() ?: 'localhost';

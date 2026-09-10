@@ -830,12 +830,24 @@ async function nextStep() {
             }
 
             if (!res.ok || !data.success) {
-                statusBox.innerHTML = `<div style="background: #FEE2E2; border: 1px solid #FCA5A5; padding: 14px; border-radius: 8px; font-size: 13px; color: #991B1B; display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> ${escapeHtml(data.error || 'SMTP Test Failed')}
-                </div>`;
-                toast.error(data.error || 'SMTP Connection Test Failed');
+                statusBox.innerHTML = `
+                    <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 16px; border-radius: 8px; font-size: 13px; color: #991B1B; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <div>
+                                <strong style="font-size: 14px; color: #991B1B; display: block; margin-bottom: 4px;">SMTP Connection Test Failed</strong>
+                                <div style="line-height: 1.5;">${escapeHtml(data.error || 'SMTP Test Failed')}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; border-top: 1px solid #FECACA; padding-top: 12px; margin-top: 8px;">
+                            <button type="button" onclick="prevStep()" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 12px;">← Edit SMTP Credentials (Step 5)</button>
+                            <button type="button" onclick="skipSMTPSetup()" class="btn btn-secondary btn-sm" style="padding: 6px 14px; font-size: 12px; background: #475569; border-color: #475569; color: #FFFFFF;">Skip SMTP & Continue Installation</button>
+                        </div>
+                    </div>
+                `;
+                toast.error('SMTP Connection Test Failed');
                 nextBtn.disabled = false;
-                nextBtn.innerText = 'Run SMTP Test';
+                nextBtn.innerText = 'Retry SMTP Test';
                 return;
             }
 
