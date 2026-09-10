@@ -31,22 +31,22 @@ if ($currentUser) {
             <form id="form-add-password" onsubmit="submitAddPassword(event)">
                 <div class="form-group">
                     <label class="form-label">Application / Site Name *</label>
-                    <input type="text" name="app_name" class="form-control" placeholder="e.g. Amazon, Google, GitHub" required>
+                    <input type="text" name="app_name" class="form-control" placeholder="Enter application or site name" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Login URL</label>
-                    <input type="url" name="login_url" class="form-control" placeholder="https://">
+                    <input type="url" name="login_url" class="form-control" placeholder="e.g. https://example.com">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Username / Email</label>
-                    <input type="text" name="username" class="form-control" placeholder="username@example.com">
+                    <input type="text" name="username" class="form-control" placeholder="Enter username or email address">
                 </div>
                 <div class="form-group">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                         <label class="form-label" style="margin-bottom: 0;">Password *</label>
                         <button type="button" onclick="openPasswordGenerator()" style="background: none; border: none; font-size: 12px; font-weight: 600; color: var(--color-brand-red); cursor: pointer;">Generate</button>
                     </div>
-                    <input type="password" name="password" id="input-add-pass" class="form-control" required>
+                    <input type="password" name="password" id="input-add-pass" class="form-control" placeholder="Enter password" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Customer Folder (Optional)</label>
@@ -67,40 +67,40 @@ if ($currentUser) {
             <form id="form-add-address" onsubmit="submitAddAddress(event)" style="display: none;">
                 <div class="form-group">
                     <label class="form-label">Address Label *</label>
-                    <input type="text" name="label" class="form-control" placeholder="e.g. Home, Office" required>
+                    <input type="text" name="label" class="form-control" placeholder="e.g. Home or Office" required>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">First Name</label>
-                        <input type="text" name="first_name" class="form-control" placeholder="e.g. Alex">
+                        <input type="text" name="first_name" class="form-control" placeholder="Enter first name">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Last Name</label>
-                        <input type="text" name="last_name" class="form-control" placeholder="e.g. Morgan">
+                        <input type="text" name="last_name" class="form-control" placeholder="Enter last name">
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Address Line 1</label>
-                    <input type="text" name="address_line1" class="form-control" placeholder="e.g. 100 Enterprise Way">
+                    <input type="text" name="address_line1" class="form-control" placeholder="Enter street address">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">City</label>
-                        <input type="text" name="city" class="form-control" placeholder="e.g. San Francisco">
+                        <input type="text" name="city" class="form-control" placeholder="Enter city">
                     </div>
                     <div class="form-group">
                         <label class="form-label">State / Province</label>
-                        <input type="text" name="state" class="form-control" placeholder="e.g. California">
+                        <input type="text" name="state" class="form-control" placeholder="Enter state or province">
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label">Zip / Postal Code</label>
-                        <input type="text" name="zip_code" class="form-control" placeholder="e.g. 94107">
+                        <input type="text" name="zip_code" class="form-control" placeholder="Enter zip or postal code">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Country</label>
-                        <input type="text" name="country" class="form-control" placeholder="e.g. United States">
+                        <input type="text" name="country" class="form-control" placeholder="Enter country">
                     </div>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
@@ -113,7 +113,7 @@ if ($currentUser) {
             <form id="form-add-note" onsubmit="submitAddNote(event)" style="display: none;">
                 <div class="form-group">
                     <label class="form-label">Title *</label>
-                    <input type="text" name="title" class="form-control" placeholder="e.g. Server SSH Key, API Token" required>
+                    <input type="text" name="title" class="form-control" placeholder="Enter title" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Note Type</label>
@@ -136,16 +136,17 @@ if ($currentUser) {
             <form id="form-add-folder" onsubmit="submitAddFolder(event)" style="display: none;">
                 <div class="form-group">
                     <label class="form-label">Folder Name *</label>
-                    <input type="text" name="name" class="form-control" placeholder="e.g. Client Accounts, HR Team" required>
+                    <input type="text" name="name" class="form-control" placeholder="Enter folder name" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Customer / Client Name</label>
-                    <input type="text" name="customer_name" class="form-control" placeholder="e.g. Acme Corp">
+                    <input type="text" name="customer_name" class="form-control" placeholder="Enter customer or client name">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Customer Contact Email</label>
-                    <input type="email" name="customer_email" class="form-control" placeholder="e.g. client@acme.com">
+                    <input type="email" name="customer_email" class="form-control" placeholder="Enter customer contact email address">
                 </div>
+
 
                 <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
                     <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>

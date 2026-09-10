@@ -29,8 +29,9 @@ require __DIR__ . '/../header.php';
                     <form id="form-share-generate" onsubmit="handleGenerateShareLink(event)">
                         <div class="form-group">
                             <label class="form-label">Customer / Client Email *</label>
-                            <input type="email" name="email" id="share-email" class="form-control" placeholder="e.g. client@domain.com" required>
+                            <input type="email" name="email" id="share-email" class="form-control" placeholder="Enter customer or client email address" required>
                         </div>
+
                         <div class="form-group">
                             <label class="form-label">Link Expiration</label>
                             <select name="expiry" id="share-expiry" class="form-control" onchange="toggleCustomHours(this.value)">
