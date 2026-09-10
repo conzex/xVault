@@ -82,7 +82,8 @@ class ShareController {
         ');
         $stmt->execute([$token, $admin['id'], $email, $expiresAt, $oneTime ? 1 : 0]);
 
-        $shareUrl = APP_URL . '/share/' . $token;
+        $shareUrl = get_app_url('/share/' . $token);
+
         $html = "
             <div style='font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 10px;'>
                 <h2 style='color: #D32F2F;'>xVault Secure Access Granted</h2>

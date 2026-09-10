@@ -8,35 +8,40 @@ if (!defined('XVAULT_EXEC')) {
     define('XVAULT_EXEC', true);
 }
 
-define('APP_ENV', 'production');
+define('APP_ENV', getenv('APP_ENV') ?: 'production');
 define('APP_NAME', 'xVault');
 define('APP_VERSION', '1.0.0');
-define('APP_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+
+// Domain / Base URL configuration ('auto' dynamically auto-detects current host, domain, & subfolder)
+define('APP_URL_OVERRIDE', getenv('APP_URL') ?: 'auto');
+if (!defined('APP_URL')) {
+    define('APP_URL', function_exists('get_app_url') ? get_app_url() : '');
+}
 
 // Database Configuration
-define('DB_DRIVER', 'sqlite');
-define('DB_HOST', '127.0.0.1');
-define('DB_PORT', 3306);
-define('DB_NAME', 'xvault');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_DRIVER', getenv('DB_DRIVER') ?: 'mysql');
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_PORT', getenv('DB_PORT') ?: 3306);
+define('DB_NAME', getenv('DB_NAME') ?: 'xvault_db');
+define('DB_USER', getenv('DB_USER') ?: 'xvault_user');
+define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
-// SQLite Settings
+// SQLite Settings (Fallback)
 define('SQLITE_FILE', __DIR__ . '/storage/xvault.db');
 
 // Security & Encryption Secret Key
-define('CRYPTO_SECRET', 'f4fa9c0916fa3df85516da63bba2bf92baade26df9211b64f133e29ac0329c93');
+define('CRYPTO_SECRET', getenv('CRYPTO_SECRET') ?: 'c8a2e5d9f1b4a3c7e0d6f2a8b4c1e5f9d2a6b0c4e8f1a3b5c7d9e1f2a4b6c8d0');
 
 // SMTP Configuration
-define('SMTP_HOST', '127.0.0.1');
-define('SMTP_PORT', 587);
-define('SMTP_USER', 'smtp@conzex.com');
-define('SMTP_PASS', 'pass');
-define('SMTP_ENCRYPTION', 'tls');
-define('SMTP_FROM_EMAIL', 'vault@conzex.com');
-define('SMTP_FROM_NAME', 'xVault Security');
-define('SMTP_REPLY_TO', 'vault@conzex.com');
+define('SMTP_HOST', getenv('SMTP_HOST') ?: 'mail.example.com');
+define('SMTP_PORT', getenv('SMTP_PORT') ?: 587);
+define('SMTP_USER', getenv('SMTP_USER') ?: 'smtp@example.com');
+define('SMTP_PASS', getenv('SMTP_PASS') ?: '');
+define('SMTP_ENCRYPTION', getenv('SMTP_ENCRYPTION') ?: 'tls');
+define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: 'vault@example.com');
+define('SMTP_FROM_NAME', getenv('SMTP_FROM_NAME') ?: 'xVault Security');
+define('SMTP_REPLY_TO', getenv('SMTP_REPLY_TO') ?: 'vault@example.com');
 
 // Production Error Logging
 ini_set('display_errors', '0');

@@ -144,7 +144,8 @@ class AuthController {
         log_security_event('USER_REGISTERED', "New account created: {$email} ({$role})", $userId);
 
         if (!$isVerified) {
-            $verifyLink = APP_URL . '/verify-email?token=' . $verificationToken;
+        $verifyLink = get_app_url('/verify-email?token=' . $verificationToken);
+
             $html = "<h2>Welcome to xVault</h2><p>Hi {$name}, please verify your account by clicking <a href='{$verifyLink}'>this link</a>.</p>";
             send_app_email($email, 'Verify Your xVault Account', $html);
         }
@@ -226,7 +227,7 @@ class AuthController {
         $update = $db->prepare('UPDATE users SET verification_token = ? WHERE id = ?');
         $update->execute([$token, $user['id']]);
 
-        $verifyLink = APP_URL . '/verify-email?token=' . $token;
+        $verifyLink = get_app_url('/verify-email?token=' . $token);
         $html = "<h2>xVault Account Verification</h2><p>Please verify your email address: <a href='{$verifyLink}'>{$verifyLink}</a></p>";
         send_app_email($email, 'Verify Your xVault Account', $html);
 
@@ -252,7 +253,7 @@ class AuthController {
         $update = $db->prepare('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?');
         $update->execute([$token, $expiry, $user['id']]);
 
-        $resetLink = APP_URL . '/reset-password?token=' . $token;
+        $resetLink = get_app_url('/reset-password?token=' . $token);
         $html = "<h2>Password Reset Request</h2><p>Click the link to reset your xVault password (expires in 1 hour): <a href='{$resetLink}'>{$resetLink}</a></p>";
         send_app_email($email, 'Password Reset Request', $html);
 

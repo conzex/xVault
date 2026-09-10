@@ -490,8 +490,12 @@ class InstallController {
                 "}\n\n" .
                 "define('APP_ENV', 'production');\n" .
                 "define('APP_NAME', 'xVault');\n" .
-                "define('APP_VERSION', '1.0.0');\n" .
-                "define('APP_URL', (isset(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . (\$_SERVER['HTTP_HOST'] ?? 'localhost'));\n\n" .
+                "define('APP_VERSION', '1.0.0');\n\n" .
+                "// Dynamic Canonical Domain Auto-Detection\n" .
+                "define('APP_URL_OVERRIDE', 'auto');\n" .
+                "if (!defined('APP_URL')) {\n" .
+                "    define('APP_URL', function_exists('get_app_url') ? get_app_url() : '');\n" .
+                "}\n\n" .
                 "// Database Configuration\n" .
                 "define('DB_DRIVER', " . var_export($dbInfo['driver'], true) . ");\n" .
                 "define('DB_HOST', " . var_export($dbInfo['host'] ?? '127.0.0.1', true) . ");\n" .

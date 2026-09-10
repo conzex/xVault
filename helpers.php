@@ -8,7 +8,53 @@ if (!defined('XVAULT_EXEC')) {
     define('XVAULT_EXEC', true);
 }
 
+/**
+ * Automatically detect and resolve current canonical Application Base URL
+ * Handles HTTP/HTTPS, custom domains, subdomains, non-standard ports, and subfolder deployments.
+ */
+function get_app_url($path = '') {
+    static $detectedUrl = null;
+
+    if ($detectedUrl === null) {
+        if (defined('APP_URL_OVERRIDE') && APP_URL_OVERRIDE !== '' && APP_URL_OVERRIDE !== 'auto') {
+            $detectedUrl = rtrim(APP_URL_OVERRIDE, '/');
+        } else {
+            // Detect HTTPS / Scheme
+            $isHttps = (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on') ||
+                       (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+                       (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+            $scheme = $isHttps ? 'https' : 'http';
+
+            // Detect Host & Port safely (Sanitize to prevent Host Header Injection)
+            $rawHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+            if (preg_match('/^[a-zA-Z0-9\.\-\:]+$/', $rawHost)) {
+                $host = $rawHost;
+            } else {
+                $host = 'localhost';
+            }
+
+            // Detect Base Path for Subdirectories / Subfolders
+            $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+            $dir = rtrim(dirname($scriptName), '/\\');
+            $baseDir = ($dir === '/' || $dir === '\\') ? '' : $dir;
+
+            $detectedUrl = "{$scheme}://{$host}{$baseDir}";
+        }
+    }
+
+    if ($path !== '') {
+        return rtrim($detectedUrl, '/') . '/' . ltrim($path, '/');
+    }
+
+    return $detectedUrl;
+}
+
+if (!defined('APP_URL')) {
+    define('APP_URL', get_app_url());
+}
+
 require_once __DIR__ . '/config.php';
+
 
 /**
  * Initialize secure PHP session

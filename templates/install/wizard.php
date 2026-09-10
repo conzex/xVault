@@ -469,7 +469,7 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 </div>
                 <div>
                     <label>Email Address</label>
-                    <input type="email" id="admin_email" value="admin@xvault.local" placeholder="admin@domain.com">
+                    <input type="email" id="admin_email" value="admin@example.com" placeholder="admin@domain.com">
                 </div>
                 <div>
                     <label>First Name</label>
@@ -498,23 +498,23 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="form-grid">
                 <div>
                     <label>SMTP Host</label>
-                    <input type="text" id="smtp_host" value="mail.conzex.com" placeholder="mail.yourdomain.com">
+                    <input type="text" id="smtp_host" value="mail.example.com" placeholder="mail.yourdomain.com">
                 </div>
                 <div>
                     <label>SMTP Port</label>
-                    <input type="number" id="smtp_port" value="465" placeholder="465 or 587">
+                    <input type="number" id="smtp_port" value="587" placeholder="465 or 587">
                 </div>
                 <div>
                     <label>Encryption Security</label>
                     <select id="smtp_enc">
-                        <option value="ssl" selected>SSL (Port 465)</option>
-                        <option value="tls">TLS / STARTTLS (Port 587)</option>
+                        <option value="tls" selected>TLS / STARTTLS (Port 587)</option>
+                        <option value="ssl">SSL (Port 465)</option>
                         <option value="none">None (Port 25)</option>
                     </select>
                 </div>
                 <div>
                     <label>SMTP Username</label>
-                    <input type="text" id="smtp_user" value="vault@conzex.com" placeholder="user@domain.com">
+                    <input type="text" id="smtp_user" value="smtp@example.com" placeholder="user@domain.com">
                 </div>
                 <div>
                     <label>SMTP Password</label>
@@ -526,10 +526,11 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 </div>
                 <div class="form-group-full">
                     <label>From Email Address</label>
-                    <input type="email" id="smtp_from_email" value="vault@conzex.com" placeholder="vault@yourdomain.com">
+                    <input type="email" id="smtp_from_email" value="vault@example.com" placeholder="vault@yourdomain.com">
                 </div>
             </div>
         </div>
+
 
         <!-- Step 6: SMTP Authentication/Test -->
         <div class="wizard-page" id="page-6">
