@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
     status VARCHAR(50) DEFAULT 'active',
     is_verified TINYINT(1) DEFAULT 0,
     verification_token VARCHAR(255) NULL,
+    verification_token_hash VARCHAR(255) NULL,
+    verification_token_expiry DATETIME NULL,
     reset_token VARCHAR(255) NULL,
     reset_token_expiry DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -189,8 +189,14 @@ if ($path === '/login') {
     exit;
 }
 
-if ($path === '/verify-email') {
-    require __DIR__ . '/templates/pages/verify_email.php';
+if ($path === '/verify-email' || preg_match('#^/verify-email/([a-zA-Z0-9_-]+)$#i', $path, $m)) {
+    $token = $m[1] ?? ($_GET['token'] ?? null);
+    AuthController::verifyEmail($token);
+    exit;
+}
+
+if ($path === '/resend-verification') {
+    AuthController::resendVerification();
     exit;
 }
 

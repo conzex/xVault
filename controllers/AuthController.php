@@ -130,29 +130,43 @@ class AuthController {
         }
 
         $passwordHash = hash_master_password($password);
-        $verificationToken = bin2hex(random_bytes(32));
+        $rawToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $tokenExpiry = date('Y-m-d H:i:s', time() + 86400); // 24 hours
 
         $countStmt = $db->query('SELECT COUNT(*) as cnt FROM users');
         $userCount = (int)$countStmt->fetch()['cnt'];
         $role = ($userCount === 0) ? 'admin' : 'user';
         $isVerified = ($role === 'admin') ? 1 : 0;
 
-        $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, is_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?)');
-        $insert->execute([$email, $passwordHash, $role, $name, $isVerified, $verificationToken]);
+        $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, is_verified, verification_token, verification_token_hash, verification_token_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $insert->execute([$email, $passwordHash, $role, $name, $isVerified, $rawToken, $tokenHash, $tokenExpiry]);
         $userId = $db->lastInsertId();
 
         log_security_event('USER_REGISTERED', "New account created: {$email} ({$role})", $userId);
 
+        $emailSent = false;
         if (!$isVerified) {
-            $verifyLink = get_app_url('/verify-email?token=' . $verificationToken);
-            $body = "<p>Hi <strong>" . e($name) . "</strong>,</p><p>Thank you for creating an account on xVault Enterprise Password Manager. Please verify your email address to activate your account access.</p>";
-            send_user_transactional_email($email, 'Verify Your xVault Account', 'Activate Your xVault Account', $body, $verifyLink, 'Verify Email Address', 'If you did not create this account, please ignore this email.');
+            $verifyLink = get_app_url('/verify-email/' . $rawToken);
+            $body = "<p>Hi <strong>" . e($name) . "</strong>,</p>" .
+                    "<p>Thank you for creating an account on xVault Enterprise Password Manager. Please verify your email address to activate your account access and unlock your vault.</p>" .
+                    "<p>This verification link is secure and valid for <strong>24 hours</strong>. If you did not create this account, no action is required.</p>" .
+                    "<p style='word-break: break-all; margin-top: 15px;'><small>Alternative link: <a href='" . e($verifyLink) . "'>" . e($verifyLink) . "</a></small></p>";
+            
+            $emailSent = send_user_transactional_email($email, 'Verify Your xVault Account', 'Activate Your xVault Account', $body, $verifyLink, 'Verify Email Address', 'This link is unique to your account and expires in 24 hours.');
             send_admin_security_notification('NEW_USER_REGISTERED', "New account registered: {$email} ({$name})");
         }
 
+        $responseMsg = $isVerified 
+            ? 'Admin account created successfully. You can log in immediately.' 
+            : ($emailSent 
+                ? 'Registration successful! Verification email sent. Please check your inbox.' 
+                : 'Registration successful! However, email delivery is currently unavailable/unconfigured. Please contact system administrator.');
+
         json_response([
             'success' => true,
-            'message' => $isVerified ? 'Admin account created successfully. You can log in immediately.' : 'Registration successful! Verification email sent.'
+            'email_sent' => $emailSent,
+            'message' => $responseMsg
         ], 201);
     }
 
@@ -185,54 +199,127 @@ class AuthController {
         json_response(['success' => true, 'message' => 'Vault locked']);
     }
 
-    public static function verifyEmail() {
+    public static function verifyEmail($routeToken = null) {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_REQUEST;
-        $token = trim($input['token'] ?? '');
+        $token = trim($routeToken ?: ($input['token'] ?? ''));
 
-        if (empty($token)) {
-            json_response(['error' => 'Verification token is required'], 400);
+        $status = 'invalid';
+        $message = 'The verification link is invalid, malformed, revoked, or has already been used.';
+        $userEmail = '';
+
+        if (!empty($token)) {
+            $tokenHash = hash('sha256', $token);
+            $db = getDB();
+            $stmt = $db->prepare('SELECT id, email, name, is_verified, verification_token_expiry FROM users WHERE verification_token_hash = ? OR verification_token = ?');
+            $stmt->execute([$tokenHash, $token]);
+            $user = $stmt->fetch();
+
+            if ($user) {
+                $userEmail = $user['email'];
+                if (!empty($user['is_verified'])) {
+                    $status = 'already_verified';
+                    $message = 'Your email address has already been verified. You can now log in.';
+                } elseif (!empty($user['verification_token_expiry']) && strtotime($user['verification_token_expiry']) < time()) {
+                    $status = 'expired';
+                    $message = 'Your email verification link has expired. Please request a new verification email below.';
+                } else {
+                    $update = $db->prepare('UPDATE users SET is_verified = 1, verification_token = NULL, verification_token_hash = NULL, verification_token_expiry = NULL WHERE id = ?');
+                    $update->execute([$user['id']]);
+
+                    log_security_event('EMAIL_VERIFIED', "Email verified for {$user['email']}", $user['id']);
+                    send_admin_security_notification('USER_EMAIL_VERIFIED', "User account activated and email verified: {$user['email']}");
+
+                    $status = 'success';
+                    $message = 'Your email address has been successfully verified! You can now log in to your vault.';
+                }
+            }
         }
 
-        $db = getDB();
-        $stmt = $db->prepare('SELECT id, email, name FROM users WHERE verification_token = ?');
-        $stmt->execute([$token]);
-        $user = $stmt->fetch();
-
-        if (!$user) {
-            json_response(['error' => 'Invalid or expired verification token'], 400);
+        if (is_api_request()) {
+            $statusCode = ($status === 'success' || $status === 'already_verified') ? 200 : 400;
+            json_response([
+                'success' => ($status === 'success' || $status === 'already_verified'),
+                'status' => $status,
+                'message' => $message,
+                'email' => $userEmail
+            ], $statusCode);
         }
 
-        $update = $db->prepare('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = ?');
-        $update->execute([$user['id']]);
+        // Web view rendering context
+        $verificationResult = [
+            'status' => $status,
+            'message' => $message,
+            'email' => $userEmail
+        ];
 
-        log_security_event('EMAIL_VERIFIED', "Email verified for {$user['email']}", $user['id']);
-        send_admin_security_notification('USER_EMAIL_VERIFIED', "User account activated and email verified: {$user['email']}");
-
-        json_response(['success' => true, 'message' => 'Email verified successfully! You can now log in.']);
+        require __DIR__ . '/../templates/pages/verify_email.php';
+        exit;
     }
 
     public static function resendVerification() {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
-        $email = trim($input['email'] ?? '');
+        $email = strtolower(trim($input['email'] ?? ''));
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            json_response(['error' => 'Please enter a valid email address'], 400);
+        }
+
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        if (strpos($ip, ',') !== false) {
+            $ip = trim(explode(',', $ip)[0]);
+        }
 
         $db = getDB();
-        $stmt = $db->prepare('SELECT * FROM users WHERE email = ? AND is_verified = 0');
+
+        // Rate Limit: Max 3 resends per 15 minutes per IP or Email
+        $rateStmt = $db->prepare("SELECT COUNT(*) FROM security_logs WHERE event_type = 'RESEND_VERIFICATION' AND (ip_address = ? OR details LIKE ?) AND created_at > ?");
+        $rateStmt->execute([$ip, "%{$email}%", date('Y-m-d H:i:s', time() - 900)]);
+        $recentCount = (int)$rateStmt->fetchColumn();
+
+        if ($recentCount >= 3) {
+            log_security_event('RATE_LIMIT_EXCEEDED', "Verification resend rate limit exceeded for {$email}", null);
+            json_response(['error' => 'Too many verification resend requests. Please wait 15 minutes before trying again.'], 429);
+        }
+
+        log_security_event('RESEND_VERIFICATION', "Resend verification request for {$email}", null);
+
+        $stmt = $db->prepare('SELECT id, email, name, is_verified FROM users WHERE email = ?');
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if (!$user) {
-            json_response(['error' => 'User not found or already verified'], 404);
+            // Prevent email enumeration while appearing successful
+            json_response(['success' => true, 'message' => 'If an unverified account with this email address exists, a verification link has been sent.']);
         }
 
-        $token = bin2hex(random_bytes(32));
-        $update = $db->prepare('UPDATE users SET verification_token = ? WHERE id = ?');
-        $update->execute([$token, $user['id']]);
+        if (!empty($user['is_verified'])) {
+            json_response([
+                'success' => true, 
+                'already_verified' => true, 
+                'message' => 'Your email address has already been verified. You can now log in.'
+            ]);
+        }
 
-        $verifyLink = get_app_url('/verify-email?token=' . $token);
-        $body = "<p>Hi <strong>" . e($user['name']) . "</strong>,</p><p>Please verify your email address to complete your account setup and unlock your vault.</p>";
-        send_user_transactional_email($email, 'Verify Your xVault Account', 'Email Verification Request', $body, $verifyLink, 'Verify Email Address', 'This link is unique to your account.');
+        $rawToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $tokenExpiry = date('Y-m-d H:i:s', time() + 86400); // 24 hours
 
-        json_response(['success' => true, 'message' => 'Verification email resent']);
+        $update = $db->prepare('UPDATE users SET verification_token = ?, verification_token_hash = ?, verification_token_expiry = ? WHERE id = ?');
+        $update->execute([$rawToken, $tokenHash, $tokenExpiry, $user['id']]);
+
+        $verifyLink = get_app_url('/verify-email/' . $rawToken);
+        $body = "<p>Hi <strong>" . e($user['name']) . "</strong>,</p>" .
+                "<p>We received a request to resend your email verification link for xVault Enterprise Password Manager.</p>" .
+                "<p>Please click the button below to complete your account activation. This link is valid for <strong>24 hours</strong>.</p>" .
+                "<p style='word-break: break-all; margin-top: 15px;'><small>Alternative link: <a href='" . e($verifyLink) . "'>" . e($verifyLink) . "</a></small></p>";
+
+        $sent = send_user_transactional_email($email, 'Verify Your xVault Account', 'Email Verification Request', $body, $verifyLink, 'Verify Email Address', 'This activation link is unique to your account and expires in 24 hours.');
+
+        if ($sent) {
+            json_response(['success' => true, 'message' => 'A new verification email has been sent. Please check your inbox.']);
+        } else {
+            json_response(['error' => 'Unable to send verification email. Email delivery is unavailable or SMTP is not configured.'], 503);
+        }
     }
 
     public static function forgotPassword() {
@@ -318,15 +405,25 @@ class AuthController {
             }
 
             $vToken = bin2hex(random_bytes(32));
-            $up = $db->prepare('UPDATE users SET name = ?, email = ?, is_verified = 0, verification_token = ? WHERE id = ?');
-            $up->execute([$name, $email, $vToken, $user['id']]);
+            $vHash = hash('sha256', $vToken);
+            $vExpiry = date('Y-m-d H:i:s', time() + 86400); // 24 hours
+
+            $up = $db->prepare('UPDATE users SET name = ?, email = ?, is_verified = 0, verification_token = ?, verification_token_hash = ?, verification_token_expiry = ? WHERE id = ?');
+            $up->execute([$name, $email, $vToken, $vHash, $vExpiry, $user['id']]);
 
             $_SESSION['user']['name'] = $name;
             $_SESSION['user']['email'] = $email;
 
             log_security_event('PROFILE_UPDATED', "Updated email to {$email}", $user['id']);
 
-            json_response(['success' => true, 'message' => 'Profile updated. Please verify your new email address.', 'reverify' => true]);
+            $verifyLink = get_app_url('/verify-email/' . $vToken);
+            $body = "<p>Hi <strong>" . e($name) . "</strong>,</p>" .
+                    "<p>You recently updated your account email address to <strong>" . e($email) . "</strong>.</p>" .
+                    "<p>Please verify your new email address to maintain full access to your vault. This link is valid for <strong>24 hours</strong>.</p>" .
+                    "<p style='word-break: break-all; margin-top: 15px;'><small>Alternative link: <a href='" . e($verifyLink) . "'>" . e($verifyLink) . "</a></small></p>";
+            send_user_transactional_email($email, 'Verify Your New Email Address', 'Email Address Change Verification', $body, $verifyLink, 'Verify New Email', 'This link is unique to your account.');
+
+            json_response(['success' => true, 'message' => 'Profile updated. A verification link has been sent to your new email address.', 'reverify' => true]);
         } else {
             $up = $db->prepare('UPDATE users SET name = ? WHERE id = ?');
             $up->execute([$name, $user['id']]);

@@ -10,7 +10,8 @@ if (!defined('XVAULT_EXEC')) {
 
 require_once __DIR__ . '/config.php';
 
-define('APP_DB_VERSION', '1.1.0');
+define('APP_DB_VERSION', '1.2.0');
+
 
 function getDB() {
     static $pdo = null;
@@ -82,6 +83,8 @@ function initDatabaseSchema(PDO $pdo) {
                 status TEXT DEFAULT 'active',
                 is_verified INTEGER DEFAULT 0,
                 verification_token TEXT,
+                verification_token_hash TEXT,
+                verification_token_expiry TIMESTAMP,
                 reset_token TEXT,
                 reset_token_expiry TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -216,6 +219,15 @@ function run_db_migrations(PDO $pdo, $fromVersion) {
                 $pdo->exec("CREATE TABLE IF NOT EXISTS email_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, to_email TEXT NOT NULL, subject TEXT NOT NULL, email_type TEXT DEFAULT 'transactional', status TEXT DEFAULT 'sent', error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);");
             }
         }
+        
+        // Version 1.2.0: Email verification security enhancements
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN verification_token_hash VARCHAR(255) NULL");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN verification_token_expiry DATETIME NULL");
+        } catch (\Throwable $e) {}
     } catch (\Throwable $e) {
         error_log("DB Migration warning: " . $e->getMessage());
     }

@@ -26,6 +26,15 @@ require __DIR__ . '/../header.php';
             <button type="button" id="tab-btn-register" onclick="switchAuthMode('register')" style="flex: 1; padding: 10px; font-weight: 700; font-size: 14px; background: none; border: none; border-bottom: 2px solid transparent; color: #64748B; cursor: pointer;">Create Account</button>
         </div>
 
+        <!-- UNVERIFIED NOTICE BANNER -->
+        <div id="unverified-banner" style="display: none; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: left;">
+            <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>⚠️</span> Email Verification Required
+            </div>
+            <p id="unverified-banner-msg" style="margin: 0 0 10px 0; color: #78350F; line-height: 1.4;">Please verify your email address before logging in.</p>
+            <button type="button" id="btn-login-resend" onclick="resendFromLoginBanner()" class="btn btn-secondary btn-full" style="padding: 8px 14px; font-size: 13px; font-weight: 600; border-color: #F59E0B; color: #92400E; background: #FEF3C7;">Resend Verification Email</button>
+        </div>
+
         <!-- LOGIN FORM -->
         <form id="form-login" onsubmit="handleLoginSubmit(event)">
             <div class="form-group">
@@ -96,8 +105,11 @@ function showForgotPassword() {
     switchAuthMode('forgot');
 }
 
+let lastUnverifiedEmail = '';
+
 async function handleLoginSubmit(e) {
     e.preventDefault();
+    document.getElementById('unverified-banner').style.display = 'none';
     const data = Object.fromEntries(new FormData(e.target));
     try {
         const res = await fetch('<?= APP_URL ?>/api/auth/login', {
@@ -109,11 +121,52 @@ async function handleLoginSubmit(e) {
         if (res.ok && result.success) {
             toast.success('Welcome back, ' + (result.user.name || result.user.email));
             setTimeout(() => location.href = '<?= APP_URL ?>/dashboard', 500);
+        } else if (result.unverified) {
+            lastUnverifiedEmail = data.email;
+            document.getElementById('unverified-banner-msg').textContent = result.error || 'Please verify your email address before logging in.';
+            document.getElementById('unverified-banner').style.display = 'block';
+            toast.error(result.error || 'Email verification required.');
         } else {
             toast.error(result.error || 'Invalid credentials');
         }
     } catch (err) {
         toast.error('Login error. Please try again.');
+    }
+}
+
+async function resendFromLoginBanner() {
+    const email = lastUnverifiedEmail || document.getElementById('login-email').value;
+    if (!email) {
+        toast.error('Please enter your email address');
+        return;
+    }
+    const btn = document.getElementById('btn-login-resend');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+        const res = await fetch('<?= APP_URL ?>/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        const result = await res.json();
+        if (res.ok && result.success) {
+            toast.success(result.message || 'Verification email resent successfully!');
+            btn.textContent = 'Email Sent!';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = 'Resend Verification Email';
+            }, 5000);
+        } else {
+            toast.error(result.error || 'Failed to resend verification email.');
+            btn.disabled = false;
+            btn.textContent = 'Resend Verification Email';
+        }
+    } catch (err) {
+        toast.error('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Resend Verification Email';
     }
 }
 

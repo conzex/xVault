@@ -343,12 +343,14 @@ function render_email_template($title, $bodyHtml, $ctaUrl = null, $ctaText = nul
  */
 function send_app_email($toEmail, $subject, $htmlBody) {
     if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        log_email_delivery($toEmail ?? 'invalid', $subject, 'transactional', 'failed', 'Invalid recipient email address');
         return false;
     }
 
     // Check if SMTP is enabled & configured
     if (!defined('SMTP_ENABLED') || !SMTP_ENABLED || !defined('SMTP_HOST') || empty(SMTP_HOST)) {
         error_log("SMTP disabled: Email sending to {$toEmail} skipped.");
+        log_email_delivery($toEmail, $subject, 'transactional', 'failed', 'SMTP is not enabled or configured in application settings');
         return false;
     }
 
@@ -364,7 +366,9 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             "Reply-To: {$fromEmail}",
             'X-Mailer: xVault-Mailer/' . (defined('APP_VERSION') ? APP_VERSION : '1.0.0')
         ];
-        return @mail($toEmail, $subject, $htmlBody, implode("\r\n", $headers));
+        $res = @mail($toEmail, $subject, $htmlBody, implode("\r\n", $headers));
+        log_email_delivery($toEmail, $subject, 'transactional', $res ? 'sent' : 'failed', $res ? null : 'sendmail mail() function returned false');
+        return $res;
     }
 
     // TCP Socket SMTP Delivery
@@ -376,6 +380,7 @@ function send_app_email($toEmail, $subject, $htmlBody) {
         $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
         if (!$socket) {
             error_log("SMTP socket connection to {$targetHost}:{$port} failed - {$errstr}");
+            log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP connection to {$targetHost}:{$port} failed - {$errstr}");
             return false;
         }
 
@@ -409,6 +414,7 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             if (substr($authRes, 0, 3) !== '235') {
                 fclose($socket);
                 error_log("SMTP Auth failed for user " . SMTP_USER);
+                log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP Authentication failed: " . trim($authRes));
                 return false;
             }
         }
