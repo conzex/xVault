@@ -22,6 +22,9 @@ class SecurityController {
             case 'logs':
                 self::getLogs($user['id']);
                 break;
+            case 'update-smtp':
+                self::updateSMTP();
+                break;
             default:
                 json_response(['error' => 'Invalid security action'], 400);
         }
@@ -105,6 +108,60 @@ class SecurityController {
                     'time_ago' => self::humanTimeAgo($l['created_at'])
                 ];
             }, $logs)
+        ]);
+    }
+
+    public static function updateSMTP() {
+        require_admin();
+
+        $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
+        $enabled = !empty($input['smtp_enabled']);
+        $host = trim($input['smtp_host'] ?? '');
+        $port = (int)($input['smtp_port'] ?? 587);
+        $user = trim($input['smtp_user'] ?? '');
+        $pass = $input['smtp_pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : '');
+        $enc = trim($input['smtp_enc'] ?? 'tls');
+        $fromEmail = trim($input['smtp_from_email'] ?? '');
+        $fromName = trim($input['smtp_from_name'] ?? 'xVault Security');
+        $testEmail = trim($input['test_email'] ?? '');
+
+        if ($enabled && (empty($host) || empty($fromEmail))) {
+            json_response(['error' => 'SMTP Host and From Email are required when SMTP is enabled.'], 400);
+        }
+
+        // Read current config.php to update SMTP defines cleanly
+        $configPath = __DIR__ . '/../config.php';
+        if (!file_exists($configPath)) {
+            json_response(['error' => 'Configuration file not found.'], 500);
+        }
+
+        $configStr = file_get_contents($configPath);
+
+        // Regex replacements for config.php
+        $configStr = preg_replace("/define\('SMTP_ENABLED',\s*[^)]+\);/", "define('SMTP_ENABLED', " . var_export($enabled, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_HOST',\s*[^)]+\);/", "define('SMTP_HOST', " . var_export($host, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_PORT',\s*[^)]+\);/", "define('SMTP_PORT', {$port});", $configStr);
+        $configStr = preg_replace("/define\('SMTP_USER',\s*[^)]+\);/", "define('SMTP_USER', " . var_export($user, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_PASS',\s*[^)]+\);/", "define('SMTP_PASS', " . var_export($pass, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_ENCRYPTION',\s*[^)]+\);/", "define('SMTP_ENCRYPTION', " . var_export($enc, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_FROM_EMAIL',\s*[^)]+\);/", "define('SMTP_FROM_EMAIL', " . var_export($fromEmail, true) . ");", $configStr);
+        $configStr = preg_replace("/define\('SMTP_FROM_NAME',\s*[^)]+\);/", "define('SMTP_FROM_NAME', " . var_export($fromName, true) . ");", $configStr);
+
+        file_put_contents($configPath, $configStr);
+
+        log_security_event('SMTP_CONFIG_UPDATED', "SMTP configuration updated by admin (Status: " . ($enabled ? 'Enabled' : 'Disabled') . ")");
+
+        $testSent = false;
+        if ($enabled && !empty($testEmail)) {
+            $testBody = "<p>This is a live test email sent from your xVault Enterprise Security Settings dashboard.</p>" .
+                        "<p>If you are receiving this message, your SMTP mailer settings are configured and operating correctly.</p>";
+            $testSent = send_user_transactional_email($testEmail, 'xVault SMTP Test Delivery', 'SMTP Mailer Operational', $testBody, get_app_url('/security'), 'Open Security Dashboard', 'This is an automated test message.');
+        }
+
+        json_response([
+            'success' => true,
+            'message' => $testSent ? 'SMTP Settings saved and test email sent successfully!' : 'SMTP Settings updated successfully.',
+            'test_sent' => $testSent
         ]);
     }
 

@@ -33,15 +33,16 @@ define('SQLITE_FILE', __DIR__ . '/storage/xvault.db');
 // Security & Encryption Secret Key
 define('CRYPTO_SECRET', getenv('CRYPTO_SECRET') ?: 'c8a2e5d9f1b4a3c7e0d6f2a8b4c1e5f9d2a6b0c4e8f1a3b5c7d9e1f2a4b6c8d0');
 
-// SMTP Configuration
-define('SMTP_HOST', getenv('SMTP_HOST') ?: 'mail.example.com');
+// SMTP Configuration (Optional but Recommended)
+define('SMTP_ENABLED', filter_var(getenv('SMTP_ENABLED') ?: false, FILTER_VALIDATE_BOOLEAN));
+define('SMTP_HOST', getenv('SMTP_HOST') ?: '');
 define('SMTP_PORT', getenv('SMTP_PORT') ?: 587);
-define('SMTP_USER', getenv('SMTP_USER') ?: 'smtp@example.com');
+define('SMTP_USER', getenv('SMTP_USER') ?: '');
 define('SMTP_PASS', getenv('SMTP_PASS') ?: '');
 define('SMTP_ENCRYPTION', getenv('SMTP_ENCRYPTION') ?: 'tls');
-define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: 'vault@example.com');
+define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: '');
 define('SMTP_FROM_NAME', getenv('SMTP_FROM_NAME') ?: 'xVault Security');
-define('SMTP_REPLY_TO', getenv('SMTP_REPLY_TO') ?: 'vault@example.com');
+define('SMTP_REPLY_TO', getenv('SMTP_REPLY_TO') ?: '');
 
 // Production Error Logging
 ini_set('display_errors', '0');

@@ -256,6 +256,27 @@ class InstallController {
     private static function testSMTP() {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true);
 
+        if (!empty($input['skip'])) {
+            $_SESSION['install_data']['smtp'] = [
+                'enabled' => false,
+                'host' => '',
+                'port' => 587,
+                'user' => '',
+                'pass' => '',
+                'enc' => 'tls',
+                'from_email' => '',
+                'from_name' => 'xVault Security',
+                'reply_to' => ''
+            ];
+            json_response([
+                'success' => true,
+                'skipped' => true,
+                'logs' => ["SMTP configuration skipped. Email functionality disabled until configured in settings."],
+                'message' => "SMTP setup skipped successfully."
+            ]);
+            return;
+        }
+
         $host = trim($input['smtp_host'] ?? '');
         $port = (int)($input['smtp_port'] ?? 587);
         $user = trim($input['smtp_user'] ?? '');
@@ -312,6 +333,7 @@ class InstallController {
             $logs[] = "Local/Test SMTP host detected.";
             $logs[] = "Verified native PHP mail() capability.";
             $_SESSION['install_data']['smtp'] = [
+                'enabled' => true,
                 'host' => $host,
                 'port' => $port,
                 'user' => $user,
@@ -422,6 +444,7 @@ class InstallController {
         fclose($socket);
 
         $_SESSION['install_data']['smtp'] = [
+            'enabled' => true,
             'host' => $host,
             'port' => $port,
             'user' => $user,
@@ -546,15 +569,16 @@ class InstallController {
                 "define('SQLITE_FILE', __DIR__ . '/storage/xvault.db');\n\n" .
                 "// Security & Encryption Secret Key\n" .
                 "define('CRYPTO_SECRET', " . var_export($secretKey, true) . ");\n\n" .
-                "// SMTP Configuration\n" .
-                "define('SMTP_HOST', " . var_export($smtpInfo['host'], true) . ");\n" .
-                "define('SMTP_PORT', " . var_export($smtpInfo['port'], true) . ");\n" .
-                "define('SMTP_USER', " . var_export($smtpInfo['user'], true) . ");\n" .
-                "define('SMTP_PASS', " . var_export($smtpInfo['pass'], true) . ");\n" .
-                "define('SMTP_ENCRYPTION', " . var_export($smtpInfo['enc'], true) . ");\n" .
-                "define('SMTP_FROM_EMAIL', " . var_export($smtpInfo['from_email'], true) . ");\n" .
-                "define('SMTP_FROM_NAME', " . var_export($smtpInfo['from_name'], true) . ");\n" .
-                "define('SMTP_REPLY_TO', " . var_export($smtpInfo['reply_to'], true) . ");\n\n" .
+                "// SMTP Configuration (Optional but Recommended)\n" .
+                "define('SMTP_ENABLED', " . var_export(!empty($smtpInfo['enabled']), true) . ");\n" .
+                "define('SMTP_HOST', " . var_export($smtpInfo['host'] ?? '', true) . ");\n" .
+                "define('SMTP_PORT', " . var_export((int)($smtpInfo['port'] ?? 587), true) . ");\n" .
+                "define('SMTP_USER', " . var_export($smtpInfo['user'] ?? '', true) . ");\n" .
+                "define('SMTP_PASS', " . var_export($smtpInfo['pass'] ?? '', true) . ");\n" .
+                "define('SMTP_ENCRYPTION', " . var_export($smtpInfo['enc'] ?? 'tls', true) . ");\n" .
+                "define('SMTP_FROM_EMAIL', " . var_export($smtpInfo['from_email'] ?? '', true) . ");\n" .
+                "define('SMTP_FROM_NAME', " . var_export($smtpInfo['from_name'] ?? 'xVault Security', true) . ");\n" .
+                "define('SMTP_REPLY_TO', " . var_export($smtpInfo['reply_to'] ?? '', true) . ");\n\n" .
                 "// Production Error Logging\n" .
                 "ini_set('display_errors', '0');\n" .
                 "ini_set('display_startup_errors', '0');\n" .

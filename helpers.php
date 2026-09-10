@@ -255,27 +255,231 @@ function get_flash($type = null) {
 }
 
 /**
- * Send Transactional Email
+ * Render Centralized Branded Email Template
+ */
+function render_email_template($title, $bodyHtml, $ctaUrl = null, $ctaText = null, $securityNote = null) {
+    $appUrl = get_app_url();
+    $appName = defined('APP_NAME') ? APP_NAME : 'xVault';
+    $fullTitle = e($title);
+
+    $ctaButtonHtml = '';
+    if (!empty($ctaUrl) && !empty($ctaText)) {
+        $ctaButtonHtml = '
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0 20px 0;">
+            <tr>
+                <td align="center" style="border-radius: 8px; background: #D32F2F;">
+                    <a href="' . e($ctaUrl) . '" target="_blank" style="border: 1px solid #D32F2F; border-radius: 8px; color: #ffffff; display: inline-block; font-size: 14px; font-weight: 700; padding: 12px 28px; text-decoration: none;">
+                        ' . e($ctaText) . '
+                    </a>
+                </td>
+            </tr>
+        </table>';
+    }
+
+    $securityBoxHtml = '';
+    if (!empty($securityNote)) {
+        $securityBoxHtml = '
+        <div style="background-color: #FEF2F2; border-left: 4px solid #D32F2F; border-radius: 6px; padding: 14px 18px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #991B1B;">🔒 Security Notice</p>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #7F1D1D; line-height: 1.5;">' . e($securityNote) . '</p>
+        </div>';
+    }
+
+    $host = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
+
+    return '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>' . $fullTitle . '</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; color: #1E293B; -webkit-font-smoothing: antialiased;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 32px 16px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                    <tr>
+                        <td style="background-color: #FFFFFF; padding: 24px 32px; border-bottom: 1px solid #F1F5F9;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="left">
+                                        <div style="font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px;">
+                                            <span style="display: inline-block; width: 28px; height: 28px; background: #D32F2F; border-radius: 6px; text-align: center; line-height: 28px; color: #ffffff; font-size: 16px; margin-right: 8px;">🔒</span>
+                                            <span style="color: #D32F2F;">x</span>Vault
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px;">
+                            <h1 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 800; color: #0F172A; line-height: 1.3;">' . $fullTitle . '</h1>
+                            <div style="font-size: 14px; line-height: 1.6; color: #334155;">
+                                ' . $bodyHtml . '
+                            </div>
+                            ' . $ctaButtonHtml . '
+                            ' . $securityBoxHtml . '
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #F8FAFC; padding: 24px 32px; border-top: 1px solid #F1F5F9; font-size: 12px; color: #64748B; line-height: 1.5;">
+                            <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">' . e($appName) . ' Enterprise Password Manager</p>
+                            <p style="margin: 0 0 8px 0;">Automated security notification from <a href="' . e($appUrl) . '" style="color: #D32F2F; text-decoration: none;" target="_blank">' . e($host) . '</a>. Do not reply to this email.</p>
+                            <p style="margin: 0; font-size: 11px; color: #94A3B8;">&copy; ' . date('Y') . ' ' . e($appName) . '. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>';
+}
+
+/**
+ * Send Transactional Email with SMTP Check
  */
 function send_app_email($toEmail, $subject, $htmlBody) {
-    if (empty($toEmail)) {
+    if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         return false;
     }
 
-    $headers = [
-        'MIME-Version: 1.0',
-        'Content-type: text/html; charset=utf-8',
-        'From: ' . SMTP_FROM_NAME . ' <' . SMTP_FROM_EMAIL . '>',
-        'Reply-To: ' . SMTP_FROM_EMAIL,
-        'X-Mailer: PHP/' . phpversion()
-    ];
-
-    // Use native mail() function for cPanel/Apache compatibility
-    $sent = @mail($toEmail, $subject, $htmlBody, implode("\r\n", $headers));
-    if (!$sent) {
-        error_log("Failed to send email to {$toEmail}");
+    // Check if SMTP is enabled & configured
+    if (!defined('SMTP_ENABLED') || !SMTP_ENABLED || !defined('SMTP_HOST') || empty(SMTP_HOST)) {
+        error_log("SMTP disabled: Email sending to {$toEmail} skipped.");
+        return false;
     }
-    return $sent;
+
+    $fromName = defined('SMTP_FROM_NAME') && !empty(SMTP_FROM_NAME) ? SMTP_FROM_NAME : 'xVault Security';
+    $fromEmail = defined('SMTP_FROM_EMAIL') && !empty(SMTP_FROM_EMAIL) ? SMTP_FROM_EMAIL : 'vault@' . (parse_url(get_app_url(), PHP_URL_HOST) ?: 'localhost');
+
+    // Local / Sendmail mode
+    if (in_array(strtolower(SMTP_HOST), ['localhost', '127.0.0.1'])) {
+        $headers = [
+            'MIME-Version: 1.0',
+            'Content-type: text/html; charset=utf-8',
+            "From: {$fromName} <{$fromEmail}>",
+            "Reply-To: {$fromEmail}",
+            'X-Mailer: xVault-Mailer/' . (defined('APP_VERSION') ? APP_VERSION : '1.0.0')
+        ];
+        return @mail($toEmail, $subject, $htmlBody, implode("\r\n", $headers));
+    }
+
+    // TCP Socket SMTP Delivery
+    try {
+        $protocol = (defined('SMTP_ENCRYPTION') && strtolower(SMTP_ENCRYPTION) === 'ssl') ? 'ssl://' : '';
+        $targetHost = SMTP_HOST;
+        $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 587;
+
+        $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
+        if (!$socket) {
+            error_log("SMTP socket connection to {$targetHost}:{$port} failed - {$errstr}");
+            return false;
+        }
+
+        fgets($socket, 512);
+        $clientHost = gethostname() ?: 'localhost';
+        fputs($socket, "EHLO {$clientHost}\r\n");
+        while ($line = fgets($socket, 512)) {
+            if (substr($line, 3, 1) === ' ') break;
+        }
+
+        $enc = defined('SMTP_ENCRYPTION') ? strtolower(SMTP_ENCRYPTION) : 'tls';
+        if (in_array($enc, ['tls', 'starttls'])) {
+            fputs($socket, "STARTTLS\r\n");
+            $resp = fgets($socket, 512);
+            if (substr($resp, 0, 3) === '220') {
+                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT);
+                fputs($socket, "EHLO {$clientHost}\r\n");
+                while ($line = fgets($socket, 512)) {
+                    if (substr($line, 3, 1) === ' ') break;
+                }
+            }
+        }
+
+        if (defined('SMTP_USER') && !empty(SMTP_USER) && defined('SMTP_PASS') && !empty(SMTP_PASS)) {
+            fputs($socket, "AUTH LOGIN\r\n");
+            fgets($socket, 512);
+            fputs($socket, base64_encode(SMTP_USER) . "\r\n");
+            fgets($socket, 512);
+            fputs($socket, base64_encode(SMTP_PASS) . "\r\n");
+            $authRes = fgets($socket, 512);
+            if (substr($authRes, 0, 3) !== '235') {
+                fclose($socket);
+                error_log("SMTP Auth failed for user " . SMTP_USER);
+                return false;
+            }
+        }
+
+        fputs($socket, "MAIL FROM:<{$fromEmail}>\r\n");
+        fgets($socket, 512);
+        fputs($socket, "RCPT TO:<{$toEmail}>\r\n");
+        fgets($socket, 512);
+        fputs($socket, "DATA\r\n");
+        fgets($socket, 512);
+
+        $headersStr = "MIME-Version: 1.0\r\n" .
+                      "Content-Type: text/html; charset=UTF-8\r\n" .
+                      "From: {$fromName} <{$fromEmail}>\r\n" .
+                      "To: {$toEmail}\r\n" .
+                      "Subject: {$subject}\r\n" .
+                      "Date: " . date('r') . "\r\n" .
+                      "X-Mailer: xVault Security Mailer\r\n\r\n";
+
+        fputs($socket, $headersStr . $htmlBody . "\r\n.\r\n");
+        fgets($socket, 512);
+        fputs($socket, "QUIT\r\n");
+        fclose($socket);
+        return true;
+    } catch (\Throwable $e) {
+        error_log("SMTP exception sending email to {$toEmail}: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Send Super Administrator Security Notification
+ */
+function send_admin_security_notification($eventType, $details = '') {
+    try {
+        if (!defined('SMTP_ENABLED') || !SMTP_ENABLED) {
+            return false;
+        }
+
+        $db = getDB();
+        $stmt = $db->prepare("SELECT email FROM users WHERE role = 'admin' AND status = 'active' LIMIT 1");
+        $stmt->execute();
+        $adminEmail = $stmt->fetchColumn();
+
+        if (empty($adminEmail)) {
+            return false;
+        }
+
+        $title = "Security Event: " . e($eventType);
+        $body = "<p>A critical security event has occurred on your xVault installation:</p>" .
+                "<div style='background: #F1F5F9; padding: 14px; border-radius: 8px; font-family: monospace; margin: 16px 0;'>" .
+                "<strong>Event Type:</strong> " . e($eventType) . "<br>" .
+                "<strong>Timestamp:</strong> " . date('Y-m-d H:i:s T') . "<br>" .
+                "<strong>IP Address:</strong> " . e($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1') . "<br>" .
+                "<strong>Details:</strong> " . e($details) .
+                "</div>";
+
+        $html = render_email_template($title, $body, get_app_url('/security'), "Open Security Dashboard", "Review your Security Dashboard audit logs if this action was unexpected.");
+        return send_app_email($adminEmail, "xVault Alert: {$eventType}", $html);
+    } catch (\Throwable $e) {
+        error_log("Admin notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Send Customer/User Transactional Email
+ */
+function send_user_transactional_email($toEmail, $subject, $title, $bodyContent, $ctaUrl = null, $ctaText = null, $securityNote = null) {
+    $html = render_email_template($title, $bodyContent, $ctaUrl, $ctaText, $securityNote);
+    return send_app_email($toEmail, $subject, $html);
 }
 
 /**

@@ -144,10 +144,10 @@ class AuthController {
         log_security_event('USER_REGISTERED', "New account created: {$email} ({$role})", $userId);
 
         if (!$isVerified) {
-        $verifyLink = get_app_url('/verify-email?token=' . $verificationToken);
-
-            $html = "<h2>Welcome to xVault</h2><p>Hi {$name}, please verify your account by clicking <a href='{$verifyLink}'>this link</a>.</p>";
-            send_app_email($email, 'Verify Your xVault Account', $html);
+            $verifyLink = get_app_url('/verify-email?token=' . $verificationToken);
+            $body = "<p>Hi <strong>" . e($name) . "</strong>,</p><p>Thank you for creating an account on xVault Enterprise Password Manager. Please verify your email address to activate your account access.</p>";
+            send_user_transactional_email($email, 'Verify Your xVault Account', 'Activate Your xVault Account', $body, $verifyLink, 'Verify Email Address', 'If you did not create this account, please ignore this email.');
+            send_admin_security_notification('NEW_USER_REGISTERED', "New account registered: {$email} ({$name})");
         }
 
         json_response([
@@ -194,7 +194,7 @@ class AuthController {
         }
 
         $db = getDB();
-        $stmt = $db->prepare('SELECT id, email FROM users WHERE verification_token = ?');
+        $stmt = $db->prepare('SELECT id, email, name FROM users WHERE verification_token = ?');
         $stmt->execute([$token]);
         $user = $stmt->fetch();
 
@@ -206,6 +206,7 @@ class AuthController {
         $update->execute([$user['id']]);
 
         log_security_event('EMAIL_VERIFIED', "Email verified for {$user['email']}", $user['id']);
+        send_admin_security_notification('USER_EMAIL_VERIFIED', "User account activated and email verified: {$user['email']}");
 
         json_response(['success' => true, 'message' => 'Email verified successfully! You can now log in.']);
     }
@@ -228,8 +229,8 @@ class AuthController {
         $update->execute([$token, $user['id']]);
 
         $verifyLink = get_app_url('/verify-email?token=' . $token);
-        $html = "<h2>xVault Account Verification</h2><p>Please verify your email address: <a href='{$verifyLink}'>{$verifyLink}</a></p>";
-        send_app_email($email, 'Verify Your xVault Account', $html);
+        $body = "<p>Hi <strong>" . e($user['name']) . "</strong>,</p><p>Please verify your email address to complete your account setup and unlock your vault.</p>";
+        send_user_transactional_email($email, 'Verify Your xVault Account', 'Email Verification Request', $body, $verifyLink, 'Verify Email Address', 'This link is unique to your account.');
 
         json_response(['success' => true, 'message' => 'Verification email resent']);
     }
@@ -254,10 +255,11 @@ class AuthController {
         $update->execute([$token, $expiry, $user['id']]);
 
         $resetLink = get_app_url('/reset-password?token=' . $token);
-        $html = "<h2>Password Reset Request</h2><p>Click the link to reset your xVault password (expires in 1 hour): <a href='{$resetLink}'>{$resetLink}</a></p>";
-        send_app_email($email, 'Password Reset Request', $html);
+        $body = "<p>Hi <strong>" . e($user['name'] ?: $user['email']) . "</strong>,</p><p>A password reset request was submitted for your master password. Click the button below to set a new password. This link is valid for 1 hour.</p>";
+        send_user_transactional_email($email, 'Reset Your Master Password', 'Master Password Reset Request', $body, $resetLink, 'Reset Master Password', 'If you did not request a password reset, your account remains secure and no action is required.');
 
         log_security_event('PASSWORD_RESET_REQUEST', "Password reset link requested for {$email}", $user['id']);
+        send_admin_security_notification('PASSWORD_RESET_REQUESTED', "Password reset link requested for account: {$email}");
 
         json_response(['success' => true, 'message' => 'Password reset email sent']);
     }
@@ -289,6 +291,10 @@ class AuthController {
         $update->execute([$passwordHash, $user['id']]);
 
         log_security_event('PASSWORD_RESET_SUCCESS', 'Master password reset via email link', $user['id']);
+
+        $body = "<p>Hi <strong>" . e($user['name'] ?: $user['email']) . "</strong>,</p><p>Your master password has been reset successfully. You can now log into your vault with your new password.</p>";
+        send_user_transactional_email($user['email'], 'Master Password Changed Confirmation', 'Master Password Reset Successful', $body, get_app_url('/login'), 'Log In to Vault', 'If you did not perform this password reset, contact your system administrator immediately.');
+        send_admin_security_notification('PASSWORD_RESET_SUCCESSFUL', "User master password was reset via email token for: {$user['email']}");
 
         json_response(['success' => true, 'message' => 'Password reset successfully. You can now log in with your new password.']);
     }
@@ -360,6 +366,10 @@ class AuthController {
         $up->execute([$newHash, $user['id']]);
 
         log_security_event('PASSWORD_CHANGED', 'Master password changed successfully', $user['id']);
+
+        $body = "<p>Hi <strong>" . e($user['name'] ?: $user['email']) . "</strong>,</p><p>Your master password was updated successfully from your account dashboard.</p>";
+        send_user_transactional_email($user['email'], 'Master Password Changed Confirmation', 'Master Password Updated', $body, get_app_url('/login'), 'Log In to Vault', 'If you did not make this change, contact your system administrator immediately.');
+        send_admin_security_notification('USER_PASSWORD_CHANGED', "User changed master password: {$user['email']}");
 
         json_response(['success' => true, 'message' => 'Master password updated successfully']);
     }

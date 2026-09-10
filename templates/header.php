@@ -9,6 +9,9 @@ $csrfToken = csrf_token();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($pageTitle ?? 'xVault Enterprise Password Manager') ?></title>
+    <link rel="icon" type="image/svg+xml" href="<?= APP_URL ?>/assets/images/favicon.svg">
+    <link rel="shortcut icon" href="<?= APP_URL ?>/assets/images/favicon.svg">
+    <link rel="apple-touch-icon" href="<?= APP_URL ?>/assets/images/favicon.svg">
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/main.css">
     <script>
         window.CSRF_TOKEN = "<?= $csrfToken ?>";

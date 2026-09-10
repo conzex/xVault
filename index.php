@@ -95,6 +95,9 @@ if (strpos($path, '/api/') === 0) {
     elseif ($path === '/api/security/logs') {
         SecurityController::handleRequest('logs');
     }
+    elseif ($path === '/api/security/update-smtp') {
+        SecurityController::handleRequest('update-smtp');
+    }
 
     // Vault Passwords APIs
     elseif ($path === '/api/vault' || $path === '/api/passwords') {

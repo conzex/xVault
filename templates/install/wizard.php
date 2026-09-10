@@ -7,6 +7,9 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>xVault Installation Wizard</title>
+    <link rel="icon" type="image/svg+xml" href="<?= APP_URL ?>/assets/images/favicon.svg">
+    <link rel="shortcut icon" href="<?= APP_URL ?>/assets/images/favicon.svg">
+    <link rel="apple-touch-icon" href="<?= APP_URL ?>/assets/images/favicon.svg">
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/main.css">
     <style>
         body {
@@ -492,8 +495,8 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
 
         <!-- Step 5: SMTP Configuration -->
         <div class="wizard-page" id="page-5">
-            <div class="step-title">Step 5: SMTP Mailer Configuration</div>
-            <div class="step-desc">Configure production mailer settings for transactional security emails and password resets.</div>
+            <div class="step-title">Step 5: SMTP Mailer Configuration — Recommended</div>
+            <div class="step-desc">Configure production mailer settings for transactional security emails and password resets. SMTP is recommended for email functionality, but optional.</div>
 
             <div class="form-grid">
                 <div>
@@ -528,6 +531,14 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                     <label>From Email Address</label>
                     <input type="email" id="smtp_from_email" placeholder="Enter sender email address">
                 </div>
+            </div>
+
+            <div style="margin-top: 24px; padding: 16px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div>
+                    <strong style="font-size: 13px; color: #334155; display: block;">Skip SMTP Setup for Now?</strong>
+                    <span style="font-size: 12px; color: #64748B;">You can complete installation without SMTP. Email functionality will remain disabled until configured later in Settings.</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="skipSMTPSetup()" style="white-space: nowrap; padding: 8px 16px; font-weight: 700; background: #FFFFFF; border: 1px solid #CBD5E1; color: #475569; border-radius: 6px; cursor: pointer;">Skip SMTP Setup</button>
             </div>
         </div>
 
@@ -780,8 +791,15 @@ async function nextStep() {
         return;
     }
 
-    // Step 6 -> Step 7: Run SMTP Test
+    // Step 6 -> Step 7: Run SMTP Test or Proceed if Skipped
     if (currentStep === 6) {
+        const statusBox = document.getElementById('smtp-test-status');
+        if (statusBox && statusBox.innerText.includes('SMTP setup skipped')) {
+            currentStep = 7;
+            updateTimelineUI();
+            return;
+        }
+
         nextBtn.disabled = true;
         nextBtn.innerText = 'Testing SMTP Connection...';
 
@@ -805,7 +823,6 @@ async function nextStep() {
             const data = await res.json();
 
             const logsTerminal = document.getElementById('smtp-logs');
-            const statusBox = document.getElementById('smtp-test-status');
 
             if (data.logs) {
                 logsTerminal.style.display = 'block';
@@ -890,9 +907,31 @@ function toggleDbContinueButton() {
     }
 }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+async function skipSMTPSetup() {
+    const nextBtn = document.getElementById('btn-next');
+    try {
+        const res = await fetch('/api/install/test-smtp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skip: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+            toast.info('SMTP Configuration skipped. Email delivery will remain disabled.');
+            const statusBox = document.getElementById('smtp-test-status');
+            if (statusBox) {
+                statusBox.innerHTML = `<div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 14px; border-radius: 8px; font-size: 13px; color: #1E40AF;">
+                    ℹ SMTP setup skipped. Email functionality will remain disabled until configured in Security Settings.
+                </div>`;
+            }
+            currentStep = 6;
+            updateTimelineUI();
+            nextBtn.innerText = 'Continue to Finalization';
+            nextBtn.disabled = false;
+        }
+    } catch (e) {
+        toast.error('Error skipping SMTP setup.');
+    }
 }
 </script>
 </body>
