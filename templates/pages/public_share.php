@@ -95,7 +95,10 @@ require __DIR__ . '/../header.php';
                     <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--color-brand-red); letter-spacing: 0.05em; margin-bottom: 4px;">Shared Credential Record</div>
                     <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #0F172A;"><?= e($item['app_name']) ?></h2>
                     <?php if (!empty($item['login_url'])): ?>
-                        <a href="<?= e($item['login_url']) ?>" target="_blank" style="font-size: 13px; color: #0284C7; text-decoration: none; word-break: break-all; display: inline-block; margin-top: 4px;"><?= e($item['login_url']) ?> ↗</a>
+                        <a href="<?= e($item['login_url']) ?>" target="_blank" style="font-size: 13px; color: #0284C7; text-decoration: none; word-break: break-all; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;">
+                            <?= e($item['login_url']) ?>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        </a>
                     <?php endif; ?>
                 </div>
 

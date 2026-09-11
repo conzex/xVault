@@ -34,10 +34,10 @@ require __DIR__ . '/../header.php';
             </div>
             <h3 style="font-size: 18px; font-weight: 700; color: #0F172A;">Reset Master Password</h3>
         </div>
-
         <?php if ($error): ?>
-            <div style="background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; text-align: center;">
-                ✕ <?= e($error) ?>
+            <div style="background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span><?= e($error) ?></span>
             </div>
             <a href="<?= APP_URL ?>/login" class="btn btn-secondary btn-full">Back to Login</a>
         <?php else: ?>

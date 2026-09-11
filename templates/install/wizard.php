@@ -840,7 +840,10 @@ async function nextStep() {
                             </div>
                         </div>
                         <div style="display: flex; gap: 10px; border-top: 1px solid #FECACA; padding-top: 12px; margin-top: 8px;">
-                            <button type="button" onclick="prevStep()" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 12px;">← Edit SMTP Credentials (Step 5)</button>
+                            <button type="button" onclick="prevStep()" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                                Edit SMTP Credentials (Step 5)
+                            </button>
                             <button type="button" onclick="skipSMTPSetup()" class="btn btn-secondary btn-sm" style="padding: 6px 14px; font-size: 12px; background: #475569; border-color: #475569; color: #FFFFFF;">Skip SMTP & Continue Installation</button>
                         </div>
                     </div>

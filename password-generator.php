@@ -45,11 +45,13 @@ require __DIR__ . '/templates/header.php';
 
         <!-- Action Buttons -->
         <div style="display: flex; gap: 12px; margin-bottom: 28px;">
-            <button type="button" id="pub-refresh-btn" class="btn btn-secondary" style="flex: 1; padding: 12px; font-weight: 700;">
-                🔄 Regenerate
+            <button type="button" id="pub-refresh-btn" class="btn btn-secondary" style="flex: 1; padding: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>
+                Regenerate
             </button>
-            <button type="button" id="pub-copy-btn" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 700;">
-                📋 Copy Password
+            <button type="button" id="pub-copy-btn" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy Password
             </button>
         </div>
 

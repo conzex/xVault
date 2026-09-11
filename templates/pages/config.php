@@ -170,8 +170,9 @@ require __DIR__ . '/../header.php';
                             <h3 style="font-size: 16px; font-weight: 800; color: #0F172A; margin: 0;">Production SMTP Mailer & Email Statistics</h3>
                             <p style="font-size: 12px; color: #64748B; margin: 4px 0 0 0;">Configure transactional email transport and review delivery metrics.</p>
                         </div>
-                        <span class="sidebar-badge" style="background: <?= (defined('SMTP_ENABLED') && SMTP_ENABLED) ? '#D1FAE5; color: #065F46;' : '#FEF3C7; color: #92400E;' ?>">
-                            <?= (defined('SMTP_ENABLED') && SMTP_ENABLED) ? '● SMTP Active' : '○ SMTP Disabled' ?>
+                        <span class="sidebar-badge" style="background: <?= (defined('SMTP_ENABLED') && SMTP_ENABLED) ? '#D1FAE5; color: #065F46;' : '#FEF3C7; color: #92400E;' ?>; display: inline-flex; align-items: center; gap: 6px;">
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                            <?= (defined('SMTP_ENABLED') && SMTP_ENABLED) ? 'SMTP Active' : 'SMTP Disabled' ?>
                         </span>
                     </div>
 
