@@ -627,14 +627,22 @@ function test_smtp_connection($testEmail = null) {
         $authenticated = false;
         $authErrorMsg = '';
 
+        $smtpUser = trim($cfg['user']);
+        $smtpPass = trim($cfg['pass']);
+
+        // Normalize Gmail App Passwords (strip inner spaces e.g. "abcd efgh ijkl mnop" -> "abcdefghijklmnop")
+        if (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false || preg_match('/^[a-zA-Z0-9]{4}(\s+[a-zA-Z0-9]{4}){3}$/', $smtpPass)) {
+            $smtpPass = str_replace(' ', '', $smtpPass);
+        }
+
         // Strategy 1: AUTH LOGIN
         fputs($socket, "AUTH LOGIN\r\n");
         $auth1 = read_smtp_response_full($socket);
         if ($auth1['code'] === 334) {
-            fputs($socket, base64_encode($cfg['user']) . "\r\n");
+            fputs($socket, base64_encode($smtpUser) . "\r\n");
             $auth2 = read_smtp_response_full($socket);
             if ($auth2['code'] === 334) {
-                fputs($socket, base64_encode($cfg['pass']) . "\r\n");
+                fputs($socket, base64_encode($smtpPass) . "\r\n");
                 $auth3 = read_smtp_response_full($socket);
                 if ($auth3['code'] === 235) {
                     $authenticated = true;
@@ -648,9 +656,12 @@ function test_smtp_connection($testEmail = null) {
             $authErrorMsg = $auth1['last_line'];
         }
 
-        // Strategy 2 Fallback: AUTH PLAIN
+        // Strategy 2 Fallback: AUTH PLAIN (Issue RSET to reset state machine first)
         if (!$authenticated) {
-            $plainAuthStr = base64_encode("\0" . $cfg['user'] . "\0" . $cfg['pass']);
+            fputs($socket, "RSET\r\n");
+            read_smtp_response_full($socket);
+
+            $plainAuthStr = base64_encode("\0" . $smtpUser . "\0" . $smtpPass);
             fputs($socket, "AUTH PLAIN {$plainAuthStr}\r\n");
             $plainRes = read_smtp_response_full($socket);
             if ($plainRes['code'] === 235) {
@@ -665,8 +676,11 @@ function test_smtp_connection($testEmail = null) {
         if (!$authenticated) {
             fclose($socket);
             $tip = "";
-            if (strpos($authErrorMsg, '535') !== false || strpos(strtolower($authErrorMsg), 'incorrect') !== false || strpos(strtolower($authErrorMsg), 'denied') !== false) {
-                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using Gmail/Outlook/Zoho/cPanel with 2FA, generate and use an App Password instead of your regular password.)";
+            $isGmail = (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false);
+            if ($isGmail) {
+                $tip = " (Gmail App Password Guide: 1. Ensure 2-Step Verification is turned ON at myaccount.google.com/security. 2. Go to Google Account > Security > App Passwords, generate a 16-character App Password for 'Mail'. 3. Ensure SMTP Username is your full Gmail email address e.g. user@gmail.com. 4. Note: Gmail regular account passwords will NOT work.)";
+            } elseif (strpos($authErrorMsg, '535') !== false || strpos(strtolower($authErrorMsg), 'incorrect') !== false || strpos(strtolower($authErrorMsg), 'denied') !== false) {
+                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using 2FA, generate and use an App Password instead of your regular password.)";
             }
             return [
                 'success' => false,
@@ -826,14 +840,21 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             $authenticated = false;
             $authErrorMsg = '';
 
+            $smtpUser = trim($cfg['user']);
+            $smtpPass = trim($cfg['pass']);
+
+            if (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false || preg_match('/^[a-zA-Z0-9]{4}(\s+[a-zA-Z0-9]{4}){3}$/', $smtpPass)) {
+                $smtpPass = str_replace(' ', '', $smtpPass);
+            }
+
             // Strategy 1: AUTH LOGIN
             fputs($socket, "AUTH LOGIN\r\n");
             $auth1 = read_smtp_response_full($socket);
             if ($auth1['code'] === 334) {
-                fputs($socket, base64_encode($cfg['user']) . "\r\n");
+                fputs($socket, base64_encode($smtpUser) . "\r\n");
                 $auth2 = read_smtp_response_full($socket);
                 if ($auth2['code'] === 334) {
-                    fputs($socket, base64_encode($cfg['pass']) . "\r\n");
+                    fputs($socket, base64_encode($smtpPass) . "\r\n");
                     $auth3 = read_smtp_response_full($socket);
                     if ($auth3['code'] === 235) {
                         $authenticated = true;
@@ -847,9 +868,12 @@ function send_app_email($toEmail, $subject, $htmlBody) {
                 $authErrorMsg = $auth1['last_line'];
             }
 
-            // Strategy 2 Fallback: AUTH PLAIN
+            // Strategy 2 Fallback: AUTH PLAIN (Issue RSET to reset state machine first)
             if (!$authenticated) {
-                $plainAuthStr = base64_encode("\0" . $cfg['user'] . "\0" . $cfg['pass']);
+                fputs($socket, "RSET\r\n");
+                read_smtp_response_full($socket);
+
+                $plainAuthStr = base64_encode("\0" . $smtpUser . "\0" . $smtpPass);
                 fputs($socket, "AUTH PLAIN {$plainAuthStr}\r\n");
                 $plainRes = read_smtp_response_full($socket);
                 if ($plainRes['code'] === 235) {

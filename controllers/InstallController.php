@@ -415,40 +415,67 @@ class InstallController {
 
         // 5. Authenticate if username and password supplied
         if (!empty($user) && !empty($pass)) {
-            fputs($socket, "AUTH LOGIN\r\n");
-            $authResp = read_smtp_response($socket);
-            if (substr($authResp, 0, 3) === '334') {
-                fputs($socket, base64_encode($user) . "\r\n");
-                $userResp = read_smtp_response($socket);
-                if (substr($userResp, 0, 3) === '334') {
-                    fputs($socket, base64_encode($pass) . "\r\n");
-                    $loginResult = read_smtp_response($socket);
+            $smtpUser = trim($user);
+            $smtpPass = trim($pass);
+            if (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false || preg_match('/^[a-zA-Z0-9]{4}(\s+[a-zA-Z0-9]{4}){3}$/', $smtpPass)) {
+                $smtpPass = str_replace(' ', '', $smtpPass);
+            }
 
-                    if (substr($loginResult, 0, 3) !== '235') {
-                        fclose($socket);
-                        json_response([
-                            'error' => "SMTP Authentication failed: " . trim($loginResult),
-                            'logs' => $logs
-                        ], 400);
-                        return;
+            $authenticated = false;
+            $loginResultMsg = '';
+
+            // Strategy 1: AUTH LOGIN
+            fputs($socket, "AUTH LOGIN\r\n");
+            $auth1 = read_smtp_response_full($socket);
+            if ($auth1['code'] === 334) {
+                fputs($socket, base64_encode($smtpUser) . "\r\n");
+                $auth2 = read_smtp_response_full($socket);
+                if ($auth2['code'] === 334) {
+                    fputs($socket, base64_encode($smtpPass) . "\r\n");
+                    $auth3 = read_smtp_response_full($socket);
+                    if ($auth3['code'] === 235) {
+                        $authenticated = true;
+                    } else {
+                        $loginResultMsg = $auth3['last_line'];
                     }
-                    $logs[] = "SMTP Authentication successful.";
                 } else {
-                    fclose($socket);
-                    json_response([
-                        'error' => "SMTP Username rejected: " . trim($userResp),
-                        'logs' => $logs
-                    ], 400);
-                    return;
+                    $loginResultMsg = $auth2['last_line'];
                 }
             } else {
+                $loginResultMsg = $auth1['last_line'];
+            }
+
+            // Strategy 2 Fallback: AUTH PLAIN (Issue RSET first)
+            if (!$authenticated) {
+                fputs($socket, "RSET\r\n");
+                read_smtp_response_full($socket);
+
+                $plainAuthStr = base64_encode("\0" . $smtpUser . "\0" . $smtpPass);
+                fputs($socket, "AUTH PLAIN {$plainAuthStr}\r\n");
+                $plainRes = read_smtp_response_full($socket);
+                if ($plainRes['code'] === 235) {
+                    $authenticated = true;
+                } else {
+                    if (empty($loginResultMsg)) {
+                        $loginResultMsg = $plainRes['last_line'];
+                    }
+                }
+            }
+
+            if (!$authenticated) {
                 fclose($socket);
+                $tip = "";
+                $isGmail = (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false);
+                if ($isGmail) {
+                    $tip = " (Gmail Setup Note: 1. Turn ON 2-Step Verification on Google Account. 2. Under Security > App Passwords, generate a 16-character App Password. 3. Use your full email address e.g. user@gmail.com. 4. Regular account passwords are rejected by Gmail.)";
+                }
                 json_response([
-                    'error' => "SMTP AUTH LOGIN failed or not supported: " . trim($authResp),
+                    'error' => "SMTP Authentication failed: " . trim($loginResultMsg) . $tip,
                     'logs' => $logs
                 ], 400);
                 return;
             }
+            $logs[] = "SMTP Authentication successful.";
         }
 
         // 6. Test MAIL FROM sender validation
