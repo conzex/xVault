@@ -234,11 +234,13 @@ class ConfigController {
     public static function updateSettings() {
         $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: $_POST;
 
+        $existingCfg = get_smtp_config();
         $enabled = !empty($input['smtp_enabled']);
         $host = trim($input['smtp_host'] ?? '');
         $port = (int)($input['smtp_port'] ?? 587);
         $user = trim($input['smtp_user'] ?? '');
-        $pass = $input['smtp_pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : '');
+        $inputPass = $input['smtp_pass'] ?? '';
+        $pass = ($inputPass !== '') ? $inputPass : ($existingCfg['pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : ''));
         $enc = trim($input['smtp_enc'] ?? 'tls');
         $fromEmail = trim($input['smtp_from_email'] ?? '');
         $fromName = trim($input['smtp_from_name'] ?? 'xVault Security');

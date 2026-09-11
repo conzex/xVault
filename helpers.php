@@ -664,10 +664,14 @@ function test_smtp_connection($testEmail = null) {
 
         if (!$authenticated) {
             fclose($socket);
+            $tip = "";
+            if (strpos($authErrorMsg, '535') !== false || strpos(strtolower($authErrorMsg), 'incorrect') !== false || strpos(strtolower($authErrorMsg), 'denied') !== false) {
+                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using Gmail/Outlook/Zoho/cPanel with 2FA, generate and use an App Password instead of your regular password.)";
+            }
             return [
                 'success' => false,
                 'status' => 'auth_failed',
-                'message' => 'SMTP Authentication failed: ' . $authErrorMsg
+                'message' => 'SMTP Authentication failed: ' . $authErrorMsg . $tip
             ];
         }
     }

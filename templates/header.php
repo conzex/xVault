@@ -45,9 +45,11 @@ $csrfToken = csrf_token();
         <?php if ($currentUser): ?>
         <div style="display: flex; align-items: center; gap: 16px;">
             <!-- Header Password Generator Action Button -->
-            <button type="button" onclick="openPasswordGenerator()" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px; border-radius: 20px; padding: 6px 14px; font-weight: 600; font-size: 13px;" title="Generate Secure Password">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-red)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span>Generate Password</span>
+            <button type="button" onclick="openPasswordGenerator()" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 8px; border-radius: 20px; padding: 4px 16px 4px 4px; font-weight: 600; font-size: 13px;" title="Generate Secure Password">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--color-brand-red-light); color: var(--color-brand-red); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <span style="font-weight: 600; font-size: 13px; color: #1E293B;">Generate Password</span>
             </button>
 
             <!-- User Profile Dropdown -->
