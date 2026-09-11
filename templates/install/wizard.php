@@ -498,10 +498,30 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
             <div class="step-title">Step 5: SMTP Mailer Configuration — Recommended</div>
             <div class="step-desc">Configure production mailer settings for transactional security emails and password resets. SMTP is recommended for email functionality, but optional.</div>
 
+            <!-- 1-Click Mail Provider Presets -->
+            <div style="margin-bottom: 20px; background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 10px;">Select Mail Provider Preset:</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" onclick="applySmtpPreset('google')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21.35 11.1h-9.17v2.73h6.51c-.33 1.76-1.82 3.08-3.79 3.08-2.3 0-4.16-1.86-4.16-4.16s1.86-4.16 4.16-4.16c1.07 0 2.05.41 2.8 1.09l2.06-2.06C18.42 6.3 16.7 5.5 14.7 5.5 10.45 5.5 7 8.95 7 13.2s3.45 7.7 7.7 7.7c4.41 0 7.37-3.1 7.37-7.5 0-.61-.06-1.12-.14-1.6z"/></svg> Google / Gmail
+                    </button>
+                    <button type="button" onclick="applySmtpPreset('outlook')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0078D4"><path d="M1 17.5l7.5 2.5V4L1 6.5v11zM9.5 3v18L23 21V3L9.5 3z"/></svg> Outlook / Office 365
+                    </button>
+                    <button type="button" onclick="applySmtpPreset('zoho')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#D97706"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Zoho Mail
+                    </button>
+                    <button type="button" onclick="applySmtpPreset('custom')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Custom / Other
+                    </button>
+                </div>
+                <div id="smtp-provider-hint" style="margin-top: 12px; padding: 12px 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; font-size: 12px; color: #1E40AF; line-height: 1.5; display: none;"></div>
+            </div>
+
             <div class="form-grid">
                 <div>
                     <label>SMTP Host</label>
-                    <input type="text" id="smtp_host" placeholder="e.g. smtp.example.com">
+                    <input type="text" id="smtp_host" placeholder="e.g. smtp.gmail.com">
                 </div>
                 <div>
                     <label>SMTP Port</label>
@@ -517,11 +537,11 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
                 </div>
                 <div>
                     <label>SMTP Username</label>
-                    <input type="text" id="smtp_user" placeholder="Enter SMTP username">
+                    <input type="text" id="smtp_user" placeholder="e.g. user@gmail.com / user@domain.com">
                 </div>
                 <div>
-                    <label>SMTP Password</label>
-                    <input type="password" id="smtp_pass" placeholder="Enter SMTP password">
+                    <label>SMTP Password / App Password</label>
+                    <input type="password" id="smtp_pass" placeholder="Enter password or App Password">
                 </div>
                 <div>
                     <label>From Name</label>
@@ -590,6 +610,46 @@ if (!defined('XVAULT_EXEC')) die('Direct access denied');
 <script>
 let currentStep = 1;
 let existingDbDetected = false;
+
+function applySmtpPreset(provider) {
+    const hostEl = document.getElementById('smtp_host');
+    const portEl = document.getElementById('smtp_port');
+    const encEl = document.getElementById('smtp_enc');
+    const hintEl = document.getElementById('smtp-provider-hint');
+
+    if (!hostEl || !portEl || !encEl) return;
+
+    if (provider === 'google') {
+        hostEl.value = 'smtp.gmail.com';
+        portEl.value = 587;
+        encEl.value = 'tls';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🔴 Google / Gmail Requirements:</strong><br>1. Turn <strong>2-Step Verification</strong> ON at <a href="https://myaccount.google.com/security" target="_blank" style="color: #2563EB; text-decoration: underline;">myaccount.google.com/security</a>.<br>2. Generate a 16-character <strong>App Password</strong> under Security > App Passwords.<br>3. Enter your full Gmail address (e.g. <code>user@gmail.com</code>) as Username.<br>4. Note: Regular Google passwords are rejected by Gmail SMTP.';
+        }
+    } else if (provider === 'outlook') {
+        hostEl.value = 'smtp.office365.com';
+        portEl.value = 587;
+        encEl.value = 'tls';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🔵 Outlook / Office 365 Requirements:</strong><br>1. Host is set to <code>smtp.office365.com</code> (Port 587 TLS).<br>2. Username must be your full email address (e.g. <code>user@outlook.com</code> or <code>user@company.com</code>).<br>3. Ensure <strong>SMTP AUTH</strong> is enabled in M365 Admin Center for your account.<br>4. If 2FA/MFA is enabled, generate and use an App Password.';
+        }
+    } else if (provider === 'zoho') {
+        hostEl.value = 'smtp.zoho.com';
+        portEl.value = 465;
+        encEl.value = 'ssl';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🟡 Zoho Mail Requirements:</strong><br>1. Default global host is <code>smtp.zoho.com</code> (Port 465 SSL). For EU use <code>smtp.zoho.eu</code>, for India use <code>smtp.zoho.in</code>.<br>2. If 2-Factor Authentication is active, generate an <strong>Application-Specific Password</strong> in Zoho Accounts > Security.';
+        }
+    } else if (provider === 'custom') {
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>⚙️ Custom / Private SMTP:</strong> Enter your custom SMTP host, port (587 TLS / 465 SSL / 25), and credentials provided by your hosting control panel (cPanel, SendGrid, Mailgun, AWS SES, Postmark, etc.).';
+        }
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     runRequirementsCheck();

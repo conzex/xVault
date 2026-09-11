@@ -198,10 +198,30 @@ require __DIR__ . '/../header.php';
                             <label for="cfg_smtp_enabled" style="font-size: 13px; font-weight: 700; color: #0F172A; margin: 0; cursor: pointer;">Enable Transactional SMTP Email Delivery</label>
                         </div>
 
+                        <!-- 1-Click Mail Provider Presets -->
+                        <div style="margin-bottom: 20px; background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
+                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 10px;">Select Mail Provider Preset:</label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="button" onclick="applySmtpPreset('google')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21.35 11.1h-9.17v2.73h6.51c-.33 1.76-1.82 3.08-3.79 3.08-2.3 0-4.16-1.86-4.16-4.16s1.86-4.16 4.16-4.16c1.07 0 2.05.41 2.8 1.09l2.06-2.06C18.42 6.3 16.7 5.5 14.7 5.5 10.45 5.5 7 8.95 7 13.2s3.45 7.7 7.7 7.7c4.41 0 7.37-3.1 7.37-7.5 0-.61-.06-1.12-.14-1.6z"/></svg> Google / Gmail
+                                </button>
+                                <button type="button" onclick="applySmtpPreset('outlook')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#0078D4"><path d="M1 17.5l7.5 2.5V4L1 6.5v11zM9.5 3v18L23 21V3L9.5 3z"/></svg> Outlook / Office 365
+                                </button>
+                                <button type="button" onclick="applySmtpPreset('zoho')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#D97706"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Zoho Mail
+                                </button>
+                                <button type="button" onclick="applySmtpPreset('custom')" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #1E293B; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M122v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Custom / Other
+                                </button>
+                            </div>
+                            <div id="cfg-smtp-provider-hint" style="margin-top: 12px; padding: 12px 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; font-size: 12px; color: #1E40AF; line-height: 1.5; display: none;"></div>
+                        </div>
+
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px;">
                             <div>
                                 <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">SMTP Host</label>
-                                <input type="text" id="cfg_smtp_host" value="<?= e(defined('SMTP_HOST') ? SMTP_HOST : '') ?>" placeholder="e.g. smtp.example.com" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
+                                <input type="text" id="cfg_smtp_host" value="<?= e(defined('SMTP_HOST') ? SMTP_HOST : '') ?>" placeholder="e.g. smtp.gmail.com" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">SMTP Port</label>
@@ -217,11 +237,11 @@ require __DIR__ . '/../header.php';
                             </div>
                             <div>
                                 <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">SMTP Username</label>
-                                <input type="text" id="cfg_smtp_user" value="<?= e(defined('SMTP_USER') ? SMTP_USER : '') ?>" placeholder="Enter SMTP username" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
+                                <input type="text" id="cfg_smtp_user" value="<?= e(defined('SMTP_USER') ? SMTP_USER : '') ?>" placeholder="e.g. user@gmail.com / user@domain.com" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
                             </div>
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">SMTP Password</label>
-                                <input type="password" id="cfg_smtp_pass" placeholder="Enter new password (leave blank to keep current)" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
+                                <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">SMTP Password / App Password</label>
+                                <input type="password" id="cfg_smtp_pass" placeholder="Enter password or App Password (leave blank to keep current)" style="width: 100%; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px 12px; font-size: 13px;">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Sender Name</label>
@@ -427,6 +447,46 @@ async function toggleUserStatusAdmin(userId, newStatus) {
         }
     } catch (e) {
         toast.error('Network error updating user status');
+    }
+}
+
+function applySmtpPreset(provider) {
+    const hostEl = document.getElementById('cfg_smtp_host') || document.getElementById('smtp_host');
+    const portEl = document.getElementById('cfg_smtp_port') || document.getElementById('smtp_port');
+    const encEl = document.getElementById('cfg_smtp_enc') || document.getElementById('smtp_enc');
+    const hintEl = document.getElementById('cfg-smtp-provider-hint') || document.getElementById('smtp-provider-hint');
+
+    if (!hostEl || !portEl || !encEl) return;
+
+    if (provider === 'google') {
+        hostEl.value = 'smtp.gmail.com';
+        portEl.value = 587;
+        encEl.value = 'tls';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🔴 Google / Gmail Requirements:</strong><br>1. Turn <strong>2-Step Verification</strong> ON at <a href="https://myaccount.google.com/security" target="_blank" style="color: #2563EB; text-decoration: underline;">myaccount.google.com/security</a>.<br>2. Generate a 16-character <strong>App Password</strong> under Security > App Passwords.<br>3. Enter your full Gmail address (e.g. <code>user@gmail.com</code>) as Username.<br>4. Note: Regular Google passwords are rejected by Gmail SMTP.';
+        }
+    } else if (provider === 'outlook') {
+        hostEl.value = 'smtp.office365.com';
+        portEl.value = 587;
+        encEl.value = 'tls';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🔵 Outlook / Office 365 Requirements:</strong><br>1. Host is set to <code>smtp.office365.com</code> (Port 587 TLS).<br>2. Username must be your full email address (e.g. <code>user@outlook.com</code> or <code>user@company.com</code>).<br>3. Ensure <strong>SMTP AUTH</strong> is enabled in M365 Admin Center for your account.<br>4. If 2FA/MFA is enabled, generate and use an App Password.';
+        }
+    } else if (provider === 'zoho') {
+        hostEl.value = 'smtp.zoho.com';
+        portEl.value = 465;
+        encEl.value = 'ssl';
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>🟡 Zoho Mail Requirements:</strong><br>1. Default global host is <code>smtp.zoho.com</code> (Port 465 SSL). For EU use <code>smtp.zoho.eu</code>, for India use <code>smtp.zoho.in</code>.<br>2. If 2-Factor Authentication is active, generate an <strong>Application-Specific Password</strong> in Zoho Accounts > Security.';
+        }
+    } else if (provider === 'custom') {
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = '<strong>⚙️ Custom / Private SMTP:</strong> Enter your custom SMTP host, port (587 TLS / 465 SSL / 25), and credentials provided by your hosting control panel (cPanel, SendGrid, Mailgun, AWS SES, Postmark, etc.).';
+        }
     }
 }
 

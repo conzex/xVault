@@ -608,13 +608,13 @@ function test_smtp_connection($testEmail = null) {
         fputs($socket, "STARTTLS\r\n");
         $tls = read_smtp_response_full($socket);
         if ($tls['code'] === 220) {
-            $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT);
             if (!$cryptoOk) {
                 fclose($socket);
                 return [
                     'success' => false,
                     'status' => 'tls_failed',
-                    'message' => 'TLS/SSL handshake negotiation failed.'
+                    'message' => 'TLS/SSL handshake negotiation failed. Ensure your server supports TLS 1.2+ encryption.'
                 ];
             }
             fputs($socket, "EHLO {$clientHost}\r\n");
@@ -677,10 +677,17 @@ function test_smtp_connection($testEmail = null) {
             fclose($socket);
             $tip = "";
             $isGmail = (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false);
+            $isOutlook = (strpos(strtolower($targetHost), 'office365') !== false || strpos(strtolower($targetHost), 'outlook') !== false || strpos(strtolower($targetHost), 'live.com') !== false);
+            $isZoho = (strpos(strtolower($targetHost), 'zoho') !== false);
+
             if ($isGmail) {
                 $tip = " (Gmail App Password Guide: 1. Ensure 2-Step Verification is turned ON at myaccount.google.com/security. 2. Go to Google Account > Security > App Passwords, generate a 16-character App Password for 'Mail'. 3. Ensure SMTP Username is your full Gmail email address e.g. user@gmail.com. 4. Note: Gmail regular account passwords will NOT work.)";
+            } elseif ($isOutlook) {
+                $tip = " (Outlook/Office 365 Guide: 1. Ensure your SMTP Username is your full email address e.g. user@outlook.com or user@company.com. 2. Verify that SMTP AUTH is enabled for your account in M365 Admin Center. 3. If 2FA/MFA is enabled, generate and use an App Password.)";
+            } elseif ($isZoho) {
+                $tip = " (Zoho Mail Guide: 1. Verify your region domain: smtp.zoho.com (US/Global), smtp.zoho.eu (EU), smtp.zoho.in (India). 2. If 2FA is active, generate an Application-Specific Password in Zoho Accounts > Security.)";
             } elseif (strpos($authErrorMsg, '535') !== false || strpos(strtolower($authErrorMsg), 'incorrect') !== false || strpos(strtolower($authErrorMsg), 'denied') !== false) {
-                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using 2FA, generate and use an App Password instead of your regular password.)";
+                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using Gmail/Outlook/Zoho with 2FA, generate and use an App Password instead of your regular password.)";
             }
             return [
                 'success' => false,
@@ -830,7 +837,7 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             fputs($socket, "STARTTLS\r\n");
             $tls = read_smtp_response_full($socket);
             if ($tls['code'] === 220) {
-                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT);
                 fputs($socket, "EHLO {$clientHost}\r\n");
                 $ehlo = read_smtp_response_full($socket);
             }
