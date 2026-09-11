@@ -637,12 +637,14 @@ function updateTimelineUI() {
     }
 }
 
+const APP_BASE_URL = <?= json_encode(get_app_url()) ?>;
+
 async function runRequirementsCheck() {
     const list = document.getElementById('requirements-list');
     list.innerHTML = '<div class="check-item"><span>Checking system requirements...</span></div>';
 
     try {
-        const res = await fetch('/api/install/check-requirements');
+        const res = await fetch(APP_BASE_URL + '/api/install/check-requirements');
         const data = await res.json();
 
         if (data.requirements) {
@@ -698,7 +700,7 @@ async function nextStep() {
 
 
         try {
-            const res = await fetch('/api/install/test-db', {
+            const res = await fetch(APP_BASE_URL + '/api/install/test-db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -762,7 +764,7 @@ async function nextStep() {
         };
 
         try {
-            const res = await fetch('/api/install/validate-admin', {
+            const res = await fetch(APP_BASE_URL + '/api/install/validate-admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -815,12 +817,12 @@ async function nextStep() {
 
 
         try {
-            const res = await fetch('/api/install/test-smtp', {
+            const res = await fetch(APP_BASE_URL + '/api/install/test-smtp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({ success: false, error: 'Server returned invalid or non-JSON response (HTTP ' + res.status + ')' }));
 
             const logsTerminal = document.getElementById('smtp-logs');
 
@@ -830,13 +832,14 @@ async function nextStep() {
             }
 
             if (!res.ok || !data.success) {
+                const errDetail = data.error || 'SMTP Test Connection Failed';
                 statusBox.innerHTML = `
                     <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 16px; border-radius: 8px; font-size: 13px; color: #991B1B; margin-bottom: 16px;">
                         <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                             <div>
                                 <strong style="font-size: 14px; color: #991B1B; display: block; margin-bottom: 4px;">SMTP Connection Test Failed</strong>
-                                <div style="line-height: 1.5;">${escapeHtml(data.error || 'SMTP Test Failed')}</div>
+                                <div style="line-height: 1.5;">${escapeHtml(errDetail)}</div>
                             </div>
                         </div>
                         <div style="display: flex; gap: 10px; border-top: 1px solid #FECACA; padding-top: 12px; margin-top: 8px;">
@@ -848,7 +851,7 @@ async function nextStep() {
                         </div>
                     </div>
                 `;
-                toast.error('SMTP Connection Test Failed');
+                toast.error(errDetail);
                 nextBtn.disabled = false;
                 nextBtn.innerText = 'Retry SMTP Test';
                 return;
@@ -865,6 +868,12 @@ async function nextStep() {
             }, 1000);
 
         } catch (e) {
+            const errStr = (e && e.message) ? e.message : 'Network error connecting to installer API.';
+            statusBox.innerHTML = `
+                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 16px; border-radius: 8px; font-size: 13px; color: #991B1B; margin-bottom: 16px;">
+                    <strong>SMTP Test Request Error:</strong> ${escapeHtml(errStr)}
+                </div>
+            `;
             toast.error('Network error while testing SMTP server.');
             nextBtn.disabled = false;
             nextBtn.innerText = 'Run SMTP Test';
@@ -882,7 +891,7 @@ async function nextStep() {
         };
 
         try {
-            const res = await fetch('/api/install/finalize', {
+            const res = await fetch(APP_BASE_URL + '/api/install/finalize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -925,7 +934,7 @@ function toggleDbContinueButton() {
 async function skipSMTPSetup() {
     const nextBtn = document.getElementById('btn-next');
     try {
-        const res = await fetch('/api/install/test-smtp', {
+        const res = await fetch(APP_BASE_URL + '/api/install/test-smtp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skip: true })
