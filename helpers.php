@@ -54,6 +54,7 @@ if (!defined('APP_URL')) {
 }
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/config/smtp_providers.php';
 
 /**
  * Dynamic System Settings Engine
@@ -427,6 +428,7 @@ function get_smtp_config() {
         ? in_array(strtolower((string)$dbSettings['smtp_enabled']), ['1', 'true', 'yes', 'on'], true)
         : (defined('SMTP_ENABLED') ? filter_var(SMTP_ENABLED, FILTER_VALIDATE_BOOLEAN) : false);
 
+    $provider = !empty($dbSettings['smtp_provider']) ? $dbSettings['smtp_provider'] : (defined('SMTP_PROVIDER') ? SMTP_PROVIDER : 'custom');
     $host = !empty($dbSettings['smtp_host']) ? $dbSettings['smtp_host'] : (defined('SMTP_HOST') ? SMTP_HOST : '');
     $port = !empty($dbSettings['smtp_port']) ? (int)$dbSettings['smtp_port'] : (defined('SMTP_PORT') ? (int)SMTP_PORT : 587);
     $user = !empty($dbSettings['smtp_user']) ? $dbSettings['smtp_user'] : (defined('SMTP_USER') ? SMTP_USER : '');
@@ -435,16 +437,41 @@ function get_smtp_config() {
     $fromEmail = !empty($dbSettings['smtp_from_email']) ? $dbSettings['smtp_from_email'] : (defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : '');
     $fromName = !empty($dbSettings['smtp_from_name']) ? $dbSettings['smtp_from_name'] : (defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'xVault Security');
 
+    $lastTestStatus = $dbSettings['smtp_last_test_status'] ?? 'never_tested';
+    $lastTestStage = $dbSettings['smtp_last_test_stage'] ?? 'none';
+    $lastTestTime = $dbSettings['smtp_last_test_time'] ?? null;
+    $lastTestMessage = $dbSettings['smtp_last_test_message'] ?? null;
+
+    $hasPassword = !empty($pass);
+    $passMasked = $hasPassword ? '••••••••' : '';
+
     return [
         'enabled' => $enabled,
+        'provider' => $provider,
         'host' => $host,
         'port' => $port,
         'user' => $user,
         'pass' => $pass,
+        'has_password' => $hasPassword,
+        'pass_masked' => $passMasked,
         'encryption' => $enc,
         'from_email' => $fromEmail,
-        'from_name' => $fromName
+        'from_name' => $fromName,
+        'last_test_status' => $lastTestStatus,
+        'last_test_stage' => $lastTestStage,
+        'last_test_time' => $lastTestTime,
+        'last_test_message' => $lastTestMessage
     ];
+}
+
+/**
+ * Record SMTP Test Execution Status in Database
+ */
+function record_smtp_test_result($status, $stage, $message) {
+    set_system_setting('smtp_last_test_status', $status);
+    set_system_setting('smtp_last_test_stage', $stage);
+    set_system_setting('smtp_last_test_time', date('Y-m-d H:i:s'));
+    set_system_setting('smtp_last_test_message', (string)$message);
 }
 
 
@@ -533,25 +560,33 @@ function read_smtp_response($socket) {
 }
 
 /**
- * Deep Socket & Authentication Test for SMTP Server
+ * Deep Socket & Authentication Test for SMTP Server with Stage Tracking
  */
 function test_smtp_connection($testEmail = null) {
     $cfg = get_smtp_config();
+    $providerKey = $cfg['provider'] ?? 'custom';
 
     if (empty($cfg['host']) || empty($cfg['from_email'])) {
+        $msg = 'SMTP Host and From Email must be configured.';
+        record_smtp_test_result('failed', 'configuration', $msg);
         return [
             'success' => false,
             'status' => 'not_configured',
-            'message' => 'SMTP Host and From Email must be configured.'
+            'stage' => 'configuration',
+            'message' => $msg
         ];
     }
 
+    // Stage 1: DNS Resolution
     $dnsResult = resolve_smtp_host($cfg['host']);
     if (!$dnsResult['resolved']) {
+        $msg = "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'. Please verify your SMTP Host setting in Admin Panel > Configuration.";
+        record_smtp_test_result('failed', 'dns', $msg);
         return [
             'success' => false,
             'status' => 'dns_failed',
-            'message' => "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'. Please verify your SMTP Host setting in Admin Panel > Configuration."
+            'stage' => 'dns',
+            'message' => $msg
         ];
     }
 
@@ -567,6 +602,7 @@ function test_smtp_connection($testEmail = null) {
         ]
     ]);
 
+    // Stage 2: TCP Socket Connection
     $protocol = ($enc === 'ssl' || $port === 465) ? 'ssl://' : 'tcp://';
     $socket = @stream_socket_client($protocol . $targetHost . ':' . $port, $errno, $errstr, 8, STREAM_CLIENT_CONNECT, $context);
 
@@ -577,10 +613,13 @@ function test_smtp_connection($testEmail = null) {
         } elseif ($errno === 111 || strpos(strtolower($errstr), 'refused') !== false) {
             $tip = " Connection refused by {$targetHost}:{$port}. Verify SMTP port settings.";
         }
+        $msg = "SMTP Connection failed to {$targetHost}:{$port} - {$errstr} (code {$errno})." . $tip;
+        record_smtp_test_result('failed', 'connection', $msg);
         return [
             'success' => false,
             'status' => 'connection_failed',
-            'message' => "SMTP Connection failed to {$targetHost}:{$port} - {$errstr} (code {$errno})." . $tip
+            'stage' => 'connection',
+            'message' => $msg
         ];
     }
     stream_set_timeout($socket, 8);
@@ -588,10 +627,13 @@ function test_smtp_connection($testEmail = null) {
     $greeting = read_smtp_response_full($socket);
     if ($greeting['code'] !== 220) {
         fclose($socket);
+        $msg = 'Unexpected SMTP server greeting: ' . ($greeting['last_line'] ?: 'No response from server');
+        record_smtp_test_result('failed', 'connection', $msg);
         return [
             'success' => false,
             'status' => 'connection_failed',
-            'message' => 'Unexpected SMTP server greeting: ' . ($greeting['last_line'] ?: 'No response from server')
+            'stage' => 'connection',
+            'message' => $msg
         ];
     }
 
@@ -603,7 +645,7 @@ function test_smtp_connection($testEmail = null) {
         $ehlo = read_smtp_response_full($socket);
     }
 
-    // Upgrade with STARTTLS if requested or on port 587
+    // Stage 3: TLS Negotiation
     if (in_array($enc, ['tls', 'starttls']) || ($port === 587 && $enc !== 'ssl')) {
         fputs($socket, "STARTTLS\r\n");
         $tls = read_smtp_response_full($socket);
@@ -611,10 +653,13 @@ function test_smtp_connection($testEmail = null) {
             $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT);
             if (!$cryptoOk) {
                 fclose($socket);
+                $msg = 'TLS/SSL handshake negotiation failed. Ensure your server supports TLS 1.2+ encryption.';
+                record_smtp_test_result('failed', 'tls', $msg);
                 return [
                     'success' => false,
                     'status' => 'tls_failed',
-                    'message' => 'TLS/SSL handshake negotiation failed. Ensure your server supports TLS 1.2+ encryption.'
+                    'stage' => 'tls',
+                    'message' => $msg
                 ];
             }
             fputs($socket, "EHLO {$clientHost}\r\n");
@@ -622,7 +667,7 @@ function test_smtp_connection($testEmail = null) {
         }
     }
 
-    // Authenticate if credentials provided
+    // Stage 4: Authentication
     if (!empty($cfg['user']) && !empty($cfg['pass'])) {
         $authenticated = false;
         $authErrorMsg = '';
@@ -630,7 +675,6 @@ function test_smtp_connection($testEmail = null) {
         $smtpUser = trim($cfg['user']);
         $smtpPass = trim($cfg['pass']);
 
-        // Normalize Gmail App Passwords (strip inner spaces e.g. "abcd efgh ijkl mnop" -> "abcdefghijklmnop")
         if (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false || preg_match('/^[a-zA-Z0-9]{4}(\s+[a-zA-Z0-9]{4}){3}$/', $smtpPass)) {
             $smtpPass = str_replace(' ', '', $smtpPass);
         }
@@ -656,7 +700,7 @@ function test_smtp_connection($testEmail = null) {
             $authErrorMsg = $auth1['last_line'];
         }
 
-        // Strategy 2 Fallback: AUTH PLAIN (Issue RSET to reset state machine first)
+        // Strategy 2 Fallback: AUTH PLAIN (Issue RSET first)
         if (!$authenticated) {
             fputs($socket, "RSET\r\n");
             read_smtp_response_full($socket);
@@ -675,37 +719,60 @@ function test_smtp_connection($testEmail = null) {
 
         if (!$authenticated) {
             fclose($socket);
-            $tip = "";
-            $isGmail = (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false);
-            $isOutlook = (strpos(strtolower($targetHost), 'office365') !== false || strpos(strtolower($targetHost), 'outlook') !== false || strpos(strtolower($targetHost), 'live.com') !== false);
-            $isZoho = (strpos(strtolower($targetHost), 'zoho') !== false);
-
-            if ($isGmail) {
-                $tip = " (Gmail App Password Guide: 1. Ensure 2-Step Verification is turned ON at myaccount.google.com/security. 2. Go to Google Account > Security > App Passwords, generate a 16-character App Password for 'Mail'. 3. Ensure SMTP Username is your full Gmail email address e.g. user@gmail.com. 4. Note: Gmail regular account passwords will NOT work.)";
-            } elseif ($isOutlook) {
-                $tip = " (Outlook/Office 365 Guide: 1. Ensure your SMTP Username is your full email address e.g. user@outlook.com or user@company.com. 2. Verify that SMTP AUTH is enabled for your account in M365 Admin Center. 3. If 2FA/MFA is enabled, generate and use an App Password.)";
-            } elseif ($isZoho) {
-                $tip = " (Zoho Mail Guide: 1. Verify your region domain: smtp.zoho.com (US/Global), smtp.zoho.eu (EU), smtp.zoho.in (India). 2. If 2FA is active, generate an Application-Specific Password in Zoho Accounts > Security.)";
-            } elseif (strpos($authErrorMsg, '535') !== false || strpos(strtolower($authErrorMsg), 'incorrect') !== false || strpos(strtolower($authErrorMsg), 'denied') !== false) {
-                $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using Gmail/Outlook/Zoho with 2FA, generate and use an App Password instead of your regular password.)";
+            
+            $genericMsg = "SMTP authentication failed. Please verify the SMTP hostname, port, encryption method, username, password/app password, and provider security requirements.";
+            
+            if ($providerKey === 'custom' || empty($providerKey)) {
+                $msg = $genericMsg . (!empty($authErrorMsg) ? " (Server response: {$authErrorMsg})" : "");
+            } else {
+                $providerInfo = get_smtp_provider_info($providerKey);
+                $guidance = get_smtp_failure_guidance($providerKey);
+                $msg = "SMTP authentication failed for " . $providerInfo['name'] . ": " . ($authErrorMsg ?: '535 Incorrect credentials') . ". Guidance: " . $guidance;
             }
+
+            record_smtp_test_result('failed', 'auth', $msg);
             return [
                 'success' => false,
                 'status' => 'auth_failed',
-                'message' => 'SMTP Authentication failed: ' . $authErrorMsg . $tip
+                'stage' => 'auth',
+                'message' => $msg
             ];
         }
     }
 
-    // Send Test Email if recipient specified
+    // Stage 5 & 6: Sender Validation & Test Email Delivery
     if (!empty($testEmail) && filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
         $body = render_email_template('SMTP Diagnostic Test', '<p>This is a live test email sent from xVault Configuration System.</p>', get_app_url('/config'), 'Open Configuration', 'Your SMTP server is configured and connected successfully.');
 
         fputs($socket, "MAIL FROM:<{$cfg['from_email']}>\r\n");
         $mFrom = read_smtp_response_full($socket);
+        if ($mFrom['code'] !== 250) {
+            fputs($socket, "QUIT\r\n");
+            fclose($socket);
+            $msg = "Sender address <{$cfg['from_email']}> rejected by SMTP server: " . $mFrom['last_line'];
+            record_smtp_test_result('failed', 'sender', $msg);
+            return [
+                'success' => false,
+                'status' => 'sender_rejected',
+                'stage' => 'sender',
+                'message' => $msg
+            ];
+        }
 
         fputs($socket, "RCPT TO:<{$testEmail}>\r\n");
         $rcpt = read_smtp_response_full($socket);
+        if ($rcpt['code'] !== 250 && $rcpt['code'] !== 251) {
+            fputs($socket, "QUIT\r\n");
+            fclose($socket);
+            $msg = "Recipient address <{$testEmail}> rejected by SMTP server: " . $rcpt['last_line'];
+            record_smtp_test_result('failed', 'recipient', $msg);
+            return [
+                'success' => false,
+                'status' => 'recipient_rejected',
+                'stage' => 'recipient',
+                'message' => $msg
+            ];
+        }
 
         fputs($socket, "DATA\r\n");
         $data = read_smtp_response_full($socket);
@@ -725,10 +792,13 @@ function test_smtp_connection($testEmail = null) {
         if (!$success) {
             fputs($socket, "QUIT\r\n");
             fclose($socket);
+            $msg = 'SMTP connected & authenticated, but test email delivery failed: ' . $sendRes['last_line'];
+            record_smtp_test_result('failed', 'delivery', $msg);
             return [
                 'success' => false,
                 'status' => 'send_failed',
-                'message' => 'SMTP connected & authenticated, but recipient/message was rejected: ' . $sendRes['last_line']
+                'stage' => 'delivery',
+                'message' => $msg
             ];
         }
     }
@@ -737,12 +807,17 @@ function test_smtp_connection($testEmail = null) {
     fclose($socket);
 
     $noteStr = !empty($dnsResult['note']) ? " (" . $dnsResult['note'] . ")" : "";
+    $successMsg = !empty($testEmail)
+        ? "SMTP connection, authentication, and test email delivery to {$testEmail} succeeded!{$noteStr}"
+        : "SMTP connection and authentication verified successfully!{$noteStr}";
+
+    record_smtp_test_result('success', 'delivery', $successMsg);
+
     return [
         'success' => true,
         'status' => 'success',
-        'message' => !empty($testEmail)
-            ? "SMTP connection, authentication, and test email delivery to {$testEmail} succeeded!{$noteStr}"
-            : "SMTP connection and authentication verified successfully!{$noteStr}"
+        'stage' => 'delivery',
+        'message' => $successMsg
     ];
 }
 

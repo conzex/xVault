@@ -272,6 +272,7 @@ class InstallController {
             return;
         }
 
+        $provider = trim($input['smtp_provider'] ?? 'custom');
         $host = trim($input['smtp_host'] ?? '');
         $port = (int)($input['smtp_port'] ?? 587);
         $user = trim($input['smtp_user'] ?? '');
@@ -464,22 +465,18 @@ class InstallController {
 
             if (!$authenticated) {
                 fclose($socket);
-                $tip = "";
-                $isGmail = (strpos(strtolower($targetHost), 'gmail') !== false || strpos(strtolower($targetHost), 'google') !== false);
-                $isOutlook = (strpos(strtolower($targetHost), 'office365') !== false || strpos(strtolower($targetHost), 'outlook') !== false || strpos(strtolower($targetHost), 'live.com') !== false);
-                $isZoho = (strpos(strtolower($targetHost), 'zoho') !== false);
-
-                if ($isGmail) {
-                    $tip = " (Gmail App Password Guide: 1. Turn ON 2-Step Verification on Google Account. 2. Under Security > App Passwords, generate a 16-character App Password. 3. Use your full email address e.g. user@gmail.com. 4. Regular account passwords are rejected by Gmail.)";
-                } elseif ($isOutlook) {
-                    $tip = " (Outlook/Office 365 Guide: 1. Ensure your SMTP Username is your full email address e.g. user@outlook.com or user@company.com. 2. Verify that SMTP AUTH is enabled for your account in M365 Admin Center. 3. If 2FA/MFA is enabled, generate and use an App Password.)";
-                } elseif ($isZoho) {
-                    $tip = " (Zoho Mail Guide: 1. Verify your region domain: smtp.zoho.com (US/Global), smtp.zoho.eu (EU), smtp.zoho.in (India). 2. If 2FA is active, generate an Application-Specific Password in Zoho Accounts > Security.)";
-                } elseif (strpos($loginResultMsg, '535') !== false || strpos(strtolower($loginResultMsg), 'incorrect') !== false || strpos(strtolower($loginResultMsg), 'denied') !== false) {
-                    $tip = " (Troubleshooting 535 Error: 1. Ensure your SMTP Username is your full email address e.g. user@yourdomain.com. 2. Verify your password. 3. If using Gmail/Outlook/Zoho with 2FA, generate and use an App Password instead of your regular password.)";
+                $genericMsg = "SMTP authentication failed. Please verify the SMTP hostname, port, encryption method, username, password/app password, and provider security requirements.";
+                
+                if ($provider === 'custom' || empty($provider)) {
+                    $errDetail = $genericMsg . (!empty($loginResultMsg) ? " (Server response: " . trim($loginResultMsg) . ")" : "");
+                } else {
+                    $providerInfo = get_smtp_provider_info($provider);
+                    $guidance = get_smtp_failure_guidance($provider);
+                    $errDetail = "SMTP authentication failed for " . $providerInfo['name'] . ": " . (trim($loginResultMsg) ?: '535 Incorrect credentials') . ". Guidance: " . $guidance;
                 }
+
                 json_response([
-                    'error' => "SMTP Authentication failed: " . trim($loginResultMsg) . $tip,
+                    'error' => $errDetail,
                     'logs' => $logs
                 ], 400);
                 return;
@@ -500,6 +497,7 @@ class InstallController {
 
         $_SESSION['install_data']['smtp'] = [
             'enabled' => true,
+            'provider' => $provider,
             'host' => $host,
             'port' => $port,
             'user' => $user,
@@ -626,6 +624,7 @@ class InstallController {
                 "define('CRYPTO_SECRET', " . var_export($secretKey, true) . ");\n\n" .
                 "// SMTP Configuration (Optional but Recommended)\n" .
                 "define('SMTP_ENABLED', " . var_export(!empty($smtpInfo['enabled']), true) . ");\n" .
+                "define('SMTP_PROVIDER', " . var_export($smtpInfo['provider'] ?? 'custom', true) . ");\n" .
                 "define('SMTP_HOST', " . var_export($smtpInfo['host'] ?? '', true) . ");\n" .
                 "define('SMTP_PORT', " . var_export((int)($smtpInfo['port'] ?? 587), true) . ");\n" .
                 "define('SMTP_USER', " . var_export($smtpInfo['user'] ?? '', true) . ");\n" .

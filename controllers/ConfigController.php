@@ -31,6 +31,12 @@ class ConfigController {
             case 'toggle-user-status':
                 self::toggleUserStatus();
                 break;
+            case 'smtp-providers':
+                self::getSmtpProviders();
+                break;
+            case 'smtp-status':
+                self::getSmtpStatus();
+                break;
             case 'update-settings':
                 self::updateSettings();
                 break;
@@ -229,6 +235,31 @@ class ConfigController {
     }
 
     /**
+     * Get Centralized SMTP Providers Registry for Admin Configuration UI
+     */
+    public static function getSmtpProviders() {
+        json_response([
+            'success' => true,
+            'providers' => get_smtp_providers_registry()
+        ]);
+    }
+
+    /**
+     * Get Real-time SMTP Status and Metrics
+     */
+    public static function getSmtpStatus() {
+        $cfg = get_smtp_config();
+        
+        // Never return raw password to client
+        unset($cfg['pass']);
+
+        json_response([
+            'success' => true,
+            'config' => $cfg
+        ]);
+    }
+
+    /**
      * Update Central Platform Settings (Config & SMTP)
      */
     public static function updateSettings() {
@@ -236,11 +267,15 @@ class ConfigController {
 
         $existingCfg = get_smtp_config();
         $enabled = !empty($input['smtp_enabled']);
+        $provider = trim($input['smtp_provider'] ?? ($existingCfg['provider'] ?? 'custom'));
         $host = trim($input['smtp_host'] ?? '');
         $port = (int)($input['smtp_port'] ?? 587);
         $user = trim($input['smtp_user'] ?? '');
         $inputPass = $input['smtp_pass'] ?? '';
-        $pass = ($inputPass !== '') ? $inputPass : ($existingCfg['pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : ''));
+        
+        // Secure password handling: preserve existing password if blank
+        $pass = ($inputPass !== '' && $inputPass !== '••••••••') ? $inputPass : ($existingCfg['pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : ''));
+        
         $enc = trim($input['smtp_enc'] ?? 'tls');
         $fromEmail = trim($input['smtp_from_email'] ?? '');
         $fromName = trim($input['smtp_from_name'] ?? 'xVault Security');
@@ -252,9 +287,9 @@ class ConfigController {
 
         // 1. Save to Database system_settings
         try {
-            $db = getDB();
             $settingsToSave = [
                 'smtp_enabled' => $enabled ? 'true' : 'false',
+                'smtp_provider' => $provider,
                 'smtp_host' => $host,
                 'smtp_port' => (string)$port,
                 'smtp_user' => $user,
@@ -276,6 +311,11 @@ class ConfigController {
         if (file_exists($configPath)) {
             $configStr = file_get_contents($configPath);
             $configStr = preg_replace("/define\('SMTP_ENABLED',\s*[^)]+\);/", "define('SMTP_ENABLED', " . var_export($enabled, true) . ");", $configStr);
+            if (strpos($configStr, 'SMTP_PROVIDER') !== false) {
+                $configStr = preg_replace("/define\('SMTP_PROVIDER',\s*[^)]+\);/", "define('SMTP_PROVIDER', " . var_export($provider, true) . ");", $configStr);
+            } else {
+                $configStr = str_replace("define('SMTP_HOST',", "define('SMTP_PROVIDER', " . var_export($provider, true) . ");\ndefine('SMTP_HOST',", $configStr);
+            }
             $configStr = preg_replace("/define\('SMTP_HOST',\s*[^)]+\);/", "define('SMTP_HOST', " . var_export($host, true) . ");", $configStr);
             $configStr = preg_replace("/define\('SMTP_PORT',\s*[^)]+\);/", "define('SMTP_PORT', {$port});", $configStr);
             $configStr = preg_replace("/define\('SMTP_USER',\s*[^)]+\);/", "define('SMTP_USER', " . var_export($user, true) . ");", $configStr);
@@ -296,7 +336,8 @@ class ConfigController {
                 json_response([
                     'success' => false,
                     'error' => $testResult['message'],
-                    'status' => $testResult['status']
+                    'status' => $testResult['status'],
+                    'stage' => $testResult['stage'] ?? 'unknown'
                 ], 400);
             }
         }
