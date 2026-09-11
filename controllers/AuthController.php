@@ -137,9 +137,14 @@ class AuthController {
         $countStmt = $db->query('SELECT COUNT(*) as cnt FROM users');
         $userCount = (int)$countStmt->fetch()['cnt'];
         $role = ($userCount === 0) ? 'admin' : 'user';
-        $isVerified = ($role === 'admin') ? 1 : 0;
-        $status = ($role === 'admin') ? 'active' : 'pending_verification';
-        $emailVerifiedAt = ($role === 'admin') ? date('Y-m-d H:i:s') : null;
+
+        $smtpCfg = get_smtp_config();
+        $isSmtpConfigured = !empty($smtpCfg['enabled']) && !empty($smtpCfg['host']);
+
+        // Auto-verify user if admin role OR if SMTP is not configured on the system
+        $isVerified = ($role === 'admin' || !$isSmtpConfigured) ? 1 : 0;
+        $status = ($isVerified === 1) ? 'active' : 'pending_verification';
+        $emailVerifiedAt = ($isVerified === 1) ? date('Y-m-d H:i:s') : null;
 
         $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, status, is_verified, email_verified_at, verification_token, verification_token_hash, verification_token_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $insert->execute([$email, $passwordHash, $role, $name, $status, $isVerified, $emailVerifiedAt, $rawToken, $tokenHash, $tokenExpiry]);
@@ -159,15 +164,16 @@ class AuthController {
             send_admin_security_notification('NEW_USER_REGISTERED', "New account registered: {$email} ({$name})");
         }
 
-        $responseMsg = $isVerified 
-            ? 'Admin account created successfully. You can log in immediately.' 
+        $responseMsg = ($isVerified === 1)
+            ? 'Account created successfully! You can log in immediately.'
             : ($emailSent 
                 ? 'Registration successful! Verification email sent. Please check your inbox.' 
-                : 'Registration successful! However, email delivery is currently unavailable/unconfigured. Please contact system administrator.');
+                : 'Registration successful! Verification email queued. Please verify your email or contact system administrator.');
 
         json_response([
             'success' => true,
             'email_sent' => $emailSent,
+            'auto_verified' => ($isVerified === 1),
             'message' => $responseMsg
         ], 201);
     }
@@ -320,7 +326,24 @@ class AuthController {
         if ($sent) {
             json_response(['success' => true, 'message' => 'A new verification email has been sent. Please check your inbox.']);
         } else {
-            json_response(['error' => 'Unable to send verification email. Email delivery is unavailable or SMTP is not configured.'], 503);
+            // Auto-verify user account if SMTP is disabled/unconfigured so user is never trapped
+            $smtpCfg = get_smtp_config();
+            if (empty($smtpCfg['enabled']) || empty($smtpCfg['host'])) {
+                $autoUp = $db->prepare("UPDATE users SET is_verified = 1, status = 'active', email_verified_at = CURRENT_TIMESTAMP, verification_token = NULL, verification_token_hash = NULL, verification_token_expiry = NULL WHERE id = ?");
+                $autoUp->execute([$user['id']]);
+
+                json_response([
+                    'success' => true,
+                    'auto_verified' => true,
+                    'message' => 'SMTP is not configured. Your account has been automatically activated so you can log in immediately.',
+                    'verify_link' => $verifyLink
+                ]);
+            }
+
+            json_response([
+                'error' => 'Unable to deliver verification email. Please verify SMTP host and settings in Admin Panel > Configuration.',
+                'verify_link' => (APP_ENV === 'development') ? $verifyLink : null
+            ], 500);
         }
     }
 

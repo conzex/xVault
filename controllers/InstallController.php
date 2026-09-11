@@ -373,7 +373,7 @@ class InstallController {
         }
         stream_set_timeout($socket, 8);
 
-        $greeting = fgets($socket, 512);
+        $greeting = read_smtp_response($socket);
         $logs[] = "Server Greeting: " . trim($greeting);
 
         if (substr($greeting, 0, 3) !== '220') {
@@ -388,22 +388,22 @@ class InstallController {
         // 3. Send EHLO
         $clientName = gethostname() ?: 'localhost';
         fputs($socket, "EHLO {$clientName}\r\n");
-        while ($line = fgets($socket, 512)) {
-            if (substr($line, 3, 1) === ' ') break;
+        $ehloResp = read_smtp_response($socket);
+        if (substr($ehloResp, 0, 3) !== '250') {
+            fputs($socket, "HELO {$clientName}\r\n");
+            read_smtp_response($socket);
         }
         $logs[] = "EHLO Handshake accepted.";
 
         // 4. Test STARTTLS encryption if requested
         if (in_array(strtolower($enc), ['tls', 'starttls'])) {
             fputs($socket, "STARTTLS\r\n");
-            $starttlsResp = fgets($socket, 512);
+            $starttlsResp = read_smtp_response($socket);
             if (substr($starttlsResp, 0, 3) === '220') {
                 $logs[] = "STARTTLS Handshake requested.";
                 if (@stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT)) {
                     fputs($socket, "EHLO {$clientName}\r\n");
-                    while ($line = fgets($socket, 512)) {
-                        if (substr($line, 3, 1) === ' ') break;
-                    }
+                    read_smtp_response($socket);
                     $logs[] = "Secure TLS session established.";
                 } else {
                     $logs[] = "TLS crypto negotiation warning; proceeding with fallback connection.";
@@ -416,30 +416,44 @@ class InstallController {
         // 5. Authenticate if username and password supplied
         if (!empty($user) && !empty($pass)) {
             fputs($socket, "AUTH LOGIN\r\n");
-            $authResp = fgets($socket, 512);
+            $authResp = read_smtp_response($socket);
             if (substr($authResp, 0, 3) === '334') {
                 fputs($socket, base64_encode($user) . "\r\n");
-                fgets($socket, 512);
-                fputs($socket, base64_encode($pass) . "\r\n");
-                $loginResult = fgets($socket, 512);
+                $userResp = read_smtp_response($socket);
+                if (substr($userResp, 0, 3) === '334') {
+                    fputs($socket, base64_encode($pass) . "\r\n");
+                    $loginResult = read_smtp_response($socket);
 
-                if (substr($loginResult, 0, 3) !== '235') {
+                    if (substr($loginResult, 0, 3) !== '235') {
+                        fclose($socket);
+                        json_response([
+                            'error' => "SMTP Authentication failed: " . trim($loginResult),
+                            'logs' => $logs
+                        ], 400);
+                        return;
+                    }
+                    $logs[] = "SMTP Authentication successful.";
+                } else {
                     fclose($socket);
                     json_response([
-                        'error' => "SMTP Authentication failed: " . trim($loginResult),
+                        'error' => "SMTP Username rejected: " . trim($userResp),
                         'logs' => $logs
                     ], 400);
                     return;
                 }
-                $logs[] = "SMTP Authentication successful.";
             } else {
-                $logs[] = "AUTH LOGIN prompt response: " . trim($authResp);
+                fclose($socket);
+                json_response([
+                    'error' => "SMTP AUTH LOGIN failed or not supported: " . trim($authResp),
+                    'logs' => $logs
+                ], 400);
+                return;
             }
         }
 
         // 6. Test MAIL FROM sender validation
         fputs($socket, "MAIL FROM:<{$fromEmail}>\r\n");
-        $mailFromResp = fgets($socket, 512);
+        $mailFromResp = read_smtp_response($socket);
         if (substr($mailFromResp, 0, 3) === '250') {
             $logs[] = "Sender email address <{$fromEmail}> validated.";
         }

@@ -88,13 +88,15 @@ function get_system_setting($key, $default = null) {
 function set_system_setting($key, $value) {
     try {
         $db = getDB();
-        $driver = strtolower((string)$db->getAttribute(PDO::ATTR_DRIVER_NAME));
-        if ($driver === 'sqlite') {
-            $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
+        $chk = $db->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key = ?");
+        $chk->execute([$key]);
+        if ((int)$chk->fetchColumn() > 0) {
+            $up = $db->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
+            return $up->execute([(string)$value, $key]);
         } else {
-            $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+            $ins = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
+            return $ins->execute([$key, (string)$value]);
         }
-        return $stmt->execute([$key, (string)$value]);
     } catch (\Throwable $e) {
         error_log("set_system_setting error: " . $e->getMessage());
         return false;
@@ -445,6 +447,7 @@ function get_smtp_config() {
     ];
 }
 
+
 /**
  * Smart SMTP Host Resolver with MX & Apex Domain Fallbacks
  */
@@ -458,10 +461,9 @@ function resolve_smtp_host($host) {
         return ['host' => $host, 'ip' => $resolvedIp, 'resolved' => true, 'note' => null];
     }
 
-    // A-record lookup failed. Attempt MX record lookup on parent domain.
-    $domain = preg_replace('/^(mail|smtp)\./i', '', $host);
+    // A-record lookup failed. Check if host has MX record
     $mxHosts = [];
-    if (function_exists('getmxrr') && @getmxrr($domain, $mxHosts) && !empty($mxHosts[0])) {
+    if (function_exists('getmxrr') && @getmxrr($host, $mxHosts) && !empty($mxHosts[0])) {
         $targetHost = $mxHosts[0];
         $targetIp = gethostbyname($targetHost);
         if ($targetIp !== $targetHost) {
@@ -469,20 +471,23 @@ function resolve_smtp_host($host) {
                 'host' => $targetHost,
                 'ip' => $targetIp,
                 'resolved' => true,
-                'note' => "Resolved '{$host}' via MX record for {$domain} to '{$targetHost}' ({$targetIp})"
+                'note' => "Unable to resolve '{$host}' directly. Resolved via MX record to '{$targetHost}' ({$targetIp})"
             ];
         }
     }
 
-    // Attempt Apex domain fallback
-    $apexIp = gethostbyname($domain);
-    if ($apexIp !== $domain) {
-        return [
-            'host' => $domain,
-            'ip' => $apexIp,
-            'resolved' => true,
-            'note' => "Resolved '{$host}' to apex domain '{$domain}' ({$apexIp})"
-        ];
+    // Attempt Apex domain fallback if host starts with smtp. or mail.
+    $domain = preg_replace('/^(mail|smtp)\./i', '', $host);
+    if ($domain !== $host) {
+        $apexIp = gethostbyname($domain);
+        if ($apexIp !== $domain) {
+            return [
+                'host' => $domain,
+                'ip' => $apexIp,
+                'resolved' => true,
+                'note' => "Unable to resolve '{$host}' directly. Resolved to domain '{$domain}' ({$apexIp})"
+            ];
+        }
     }
 
     return [
@@ -491,6 +496,40 @@ function resolve_smtp_host($host) {
         'resolved' => false,
         'note' => "Unable to resolve DNS for '{$host}'."
     ];
+}
+
+/**
+ * Read complete SMTP response (handling multi-line responses per RFC 5321)
+ * Returns array with 'code', 'last_line', 'all_lines', and 'full_text'
+ */
+function read_smtp_response_full($socket) {
+    $lines = [];
+    $lastLine = '';
+    while ($line = fgets($socket, 512)) {
+        if ($line === false) {
+            break;
+        }
+        $lines[] = trim($line);
+        $lastLine = $line;
+        if (strlen($line) < 4 || substr($line, 3, 1) !== '-') {
+            break;
+        }
+    }
+    $code = (int)substr($lastLine, 0, 3);
+    return [
+        'code' => $code,
+        'last_line' => trim($lastLine),
+        'all_lines' => $lines,
+        'full_text' => implode("\n", $lines)
+    ];
+}
+
+/**
+ * Compatible legacy wrapper for read_smtp_response
+ */
+function read_smtp_response($socket) {
+    $res = read_smtp_response_full($socket);
+    return $res['last_line'];
 }
 
 /**
@@ -512,45 +551,64 @@ function test_smtp_connection($testEmail = null) {
         return [
             'success' => false,
             'status' => 'dns_failed',
-            'message' => "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'. Please verify your SMTP Host setting in Admin Panel > Configuration (e.g. mail.conzex.com, smtp.gmail.com, or your provider's SMTP server host)."
+            'message' => "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'. Please verify your SMTP Host setting in Admin Panel > Configuration."
         ];
     }
 
     $targetHost = $dnsResult['host'];
-    $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
-    $port = $cfg['port'];
+    $port = (int)$cfg['port'];
+    $enc = strtolower($cfg['encryption']);
 
-    $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+            'allow_self_signed' => true
+        ]
+    ]);
+
+    $protocol = ($enc === 'ssl' || $port === 465) ? 'ssl://' : 'tcp://';
+    $socket = @stream_socket_client($protocol . $targetHost . ':' . $port, $errno, $errstr, 8, STREAM_CLIENT_CONNECT, $context);
+
     if (!$socket) {
         $tip = "";
-        if (strpos(strtolower($errstr), 'getaddrinfo') !== false) {
-            $tip = " (DNS lookup failed for '{$targetHost}'. Please check hostname spelling or DNS records.)";
-        } elseif ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
-            $tip = " (Connection timed out to {$targetHost}:{$port}. Check if port {$port} is open and firewall is not blocking it. Standard SMTP ports: 587 for TLS, 465 for SSL, 25 for plain text.)";
+        if ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
+            $tip = " Connection timed out to {$targetHost}:{$port}. Check if port {$port} is allowed by your network/firewall (587 for TLS, 465 for SSL, 25 for plain).";
         } elseif ($errno === 111 || strpos(strtolower($errstr), 'refused') !== false) {
-            $tip = " (Connection refused on {$targetHost}:{$port}. Verify SMTP server status.)";
+            $tip = " Connection refused by {$targetHost}:{$port}. Verify SMTP port settings.";
         }
         return [
             'success' => false,
             'status' => 'connection_failed',
-            'message' => "SMTP Connection failed to {$targetHost}:{$port} - {$errstr} (code {$errno})" . $tip
+            'message' => "SMTP Connection failed to {$targetHost}:{$port} - {$errstr} (code {$errno})." . $tip
         ];
     }
     stream_set_timeout($socket, 8);
 
-    fgets($socket, 512);
-    $clientHost = gethostname() ?: 'localhost';
-    fputs($socket, "EHLO {$clientHost}\r\n");
-    while ($line = fgets($socket, 512)) {
-        if (substr($line, 3, 1) === ' ') break;
+    $greeting = read_smtp_response_full($socket);
+    if ($greeting['code'] !== 220) {
+        fclose($socket);
+        return [
+            'success' => false,
+            'status' => 'connection_failed',
+            'message' => 'Unexpected SMTP server greeting: ' . ($greeting['last_line'] ?: 'No response from server')
+        ];
     }
 
-    $enc = strtolower($cfg['encryption']);
-    if (in_array($enc, ['tls', 'starttls'])) {
+    $clientHost = gethostname() ?: 'localhost';
+    fputs($socket, "EHLO {$clientHost}\r\n");
+    $ehlo = read_smtp_response_full($socket);
+    if ($ehlo['code'] !== 250) {
+        fputs($socket, "HELO {$clientHost}\r\n");
+        $ehlo = read_smtp_response_full($socket);
+    }
+
+    // Upgrade with STARTTLS if requested or on port 587
+    if (in_array($enc, ['tls', 'starttls']) || ($port === 587 && $enc !== 'ssl')) {
         fputs($socket, "STARTTLS\r\n");
-        $resp = fgets($socket, 512);
-        if (substr($resp, 0, 3) === '220') {
-            $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT);
+        $tls = read_smtp_response_full($socket);
+        if ($tls['code'] === 220) {
+            $cryptoOk = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
             if (!$cryptoOk) {
                 fclose($socket);
                 return [
@@ -560,37 +618,73 @@ function test_smtp_connection($testEmail = null) {
                 ];
             }
             fputs($socket, "EHLO {$clientHost}\r\n");
-            while ($line = fgets($socket, 512)) {
-                if (substr($line, 3, 1) === ' ') break;
-            }
+            $ehlo = read_smtp_response_full($socket);
         }
     }
 
+    // Authenticate if credentials provided
     if (!empty($cfg['user']) && !empty($cfg['pass'])) {
+        $authenticated = false;
+        $authErrorMsg = '';
+
+        // Strategy 1: AUTH LOGIN
         fputs($socket, "AUTH LOGIN\r\n");
-        fgets($socket, 512);
-        fputs($socket, base64_encode($cfg['user']) . "\r\n");
-        fgets($socket, 512);
-        fputs($socket, base64_encode($cfg['pass']) . "\r\n");
-        $authRes = fgets($socket, 512);
-        if (substr($authRes, 0, 3) !== '235') {
+        $auth1 = read_smtp_response_full($socket);
+        if ($auth1['code'] === 334) {
+            fputs($socket, base64_encode($cfg['user']) . "\r\n");
+            $auth2 = read_smtp_response_full($socket);
+            if ($auth2['code'] === 334) {
+                fputs($socket, base64_encode($cfg['pass']) . "\r\n");
+                $auth3 = read_smtp_response_full($socket);
+                if ($auth3['code'] === 235) {
+                    $authenticated = true;
+                } else {
+                    $authErrorMsg = $auth3['last_line'];
+                }
+            } else {
+                $authErrorMsg = $auth2['last_line'];
+            }
+        } else {
+            $authErrorMsg = $auth1['last_line'];
+        }
+
+        // Strategy 2 Fallback: AUTH PLAIN
+        if (!$authenticated) {
+            $plainAuthStr = base64_encode("\0" . $cfg['user'] . "\0" . $cfg['pass']);
+            fputs($socket, "AUTH PLAIN {$plainAuthStr}\r\n");
+            $plainRes = read_smtp_response_full($socket);
+            if ($plainRes['code'] === 235) {
+                $authenticated = true;
+            } else {
+                if (empty($authErrorMsg)) {
+                    $authErrorMsg = $plainRes['last_line'];
+                }
+            }
+        }
+
+        if (!$authenticated) {
             fclose($socket);
             return [
                 'success' => false,
                 'status' => 'auth_failed',
-                'message' => 'SMTP Authentication failed: ' . trim($authRes)
+                'message' => 'SMTP Authentication failed: ' . $authErrorMsg
             ];
         }
     }
 
+    // Send Test Email if recipient specified
     if (!empty($testEmail) && filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
         $body = render_email_template('SMTP Diagnostic Test', '<p>This is a live test email sent from xVault Configuration System.</p>', get_app_url('/config'), 'Open Configuration', 'Your SMTP server is configured and connected successfully.');
+
         fputs($socket, "MAIL FROM:<{$cfg['from_email']}>\r\n");
-        fgets($socket, 512);
+        $mFrom = read_smtp_response_full($socket);
+
         fputs($socket, "RCPT TO:<{$testEmail}>\r\n");
-        fgets($socket, 512);
+        $rcpt = read_smtp_response_full($socket);
+
         fputs($socket, "DATA\r\n");
-        fgets($socket, 512);
+        $data = read_smtp_response_full($socket);
+
         $headersStr = "MIME-Version: 1.0\r\n" .
                       "Content-Type: text/html; charset=UTF-8\r\n" .
                       "From: {$cfg['from_name']} <{$cfg['from_email']}>\r\n" .
@@ -598,17 +692,32 @@ function test_smtp_connection($testEmail = null) {
                       "Subject: xVault SMTP Connectivity Test\r\n" .
                       "Date: " . date('r') . "\r\n\r\n";
         fputs($socket, $headersStr . $body . "\r\n.\r\n");
-        fgets($socket, 512);
-        log_email_delivery($testEmail, 'xVault SMTP Connectivity Test', 'test', 'sent');
+        $sendRes = read_smtp_response_full($socket);
+
+        $success = ($sendRes['code'] === 250);
+        log_email_delivery($testEmail, 'xVault SMTP Connectivity Test', 'test', $success ? 'sent' : 'failed', $success ? null : $sendRes['last_line']);
+
+        if (!$success) {
+            fputs($socket, "QUIT\r\n");
+            fclose($socket);
+            return [
+                'success' => false,
+                'status' => 'send_failed',
+                'message' => 'SMTP connected & authenticated, but recipient/message was rejected: ' . $sendRes['last_line']
+            ];
+        }
     }
 
     fputs($socket, "QUIT\r\n");
     fclose($socket);
 
+    $noteStr = !empty($dnsResult['note']) ? " (" . $dnsResult['note'] . ")" : "";
     return [
         'success' => true,
         'status' => 'success',
-        'message' => !empty($testEmail) ? "SMTP connection, authentication, and test email delivery to {$testEmail} succeeded!" : "SMTP connection and authentication verified successfully!"
+        'message' => !empty($testEmail)
+            ? "SMTP connection, authentication, and test email delivery to {$testEmail} succeeded!{$noteStr}"
+            : "SMTP connection and authentication verified successfully!{$noteStr}"
     ];
 }
 
@@ -623,15 +732,20 @@ function send_app_email($toEmail, $subject, $htmlBody) {
 
     $cfg = get_smtp_config();
 
+    $fromName = !empty($cfg['from_name']) ? $cfg['from_name'] : 'xVault Security';
+    $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : 'vault@' . (parse_url(get_app_url(), PHP_URL_HOST) ?: 'localhost');
+
     // Check if SMTP is enabled & configured
     if (!$cfg['enabled'] || empty($cfg['host'])) {
+        // Attempt native PHP mail() function fallback if available
+        if (function_exists('mail') && @mail($toEmail, $subject, $htmlBody, "MIME-Version: 1.0\r\nContent-type: text/html; charset=utf-8\r\nFrom: {$fromName} <{$fromEmail}>\r\n")) {
+            log_email_delivery($toEmail, $subject, 'transactional', 'sent', null);
+            return true;
+        }
         error_log("SMTP disabled: Email sending to {$toEmail} skipped.");
         log_email_delivery($toEmail, $subject, 'transactional', 'failed', 'SMTP is not enabled or configured in application settings');
         return false;
     }
-
-    $fromName = !empty($cfg['from_name']) ? $cfg['from_name'] : 'xVault Security';
-    $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : 'vault@' . (parse_url(get_app_url(), PHP_URL_HOST) ?: 'localhost');
 
     // Local / Sendmail mode
     if (in_array(strtolower($cfg['host']), ['localhost', '127.0.0.1'])) {
@@ -657,10 +771,20 @@ function send_app_email($toEmail, $subject, $htmlBody) {
         }
 
         $targetHost = $dnsResult['host'];
-        $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
         $port = (int)$cfg['port'];
+        $enc = strtolower($cfg['encryption']);
 
-        $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
+        $context = stream_context_create([
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            ]
+        ]);
+
+        $protocol = ($enc === 'ssl' || $port === 465) ? 'ssl://' : 'tcp://';
+        $socket = @stream_socket_client($protocol . $targetHost . ':' . $port, $errno, $errstr, 8, STREAM_CLIENT_CONNECT, $context);
+
         if (!$socket) {
             error_log("SMTP socket connection to {$targetHost}:{$port} failed - {$errstr}");
             log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP connection to {$targetHost}:{$port} failed - {$errstr}");
@@ -668,47 +792,85 @@ function send_app_email($toEmail, $subject, $htmlBody) {
         }
         stream_set_timeout($socket, 8);
 
-        fgets($socket, 512);
-        $clientHost = gethostname() ?: 'localhost';
-        fputs($socket, "EHLO {$clientHost}\r\n");
-        while ($line = fgets($socket, 512)) {
-            if (substr($line, 3, 1) === ' ') break;
+        $greeting = read_smtp_response_full($socket);
+        if ($greeting['code'] !== 220) {
+            fclose($socket);
+            error_log("SMTP Greeting failed: {$greeting['last_line']}");
+            log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP Greeting failed: " . $greeting['last_line']);
+            return false;
         }
 
-        $enc = strtolower($cfg['encryption']);
-        if (in_array($enc, ['tls', 'starttls'])) {
+        $clientHost = gethostname() ?: 'localhost';
+        fputs($socket, "EHLO {$clientHost}\r\n");
+        $ehlo = read_smtp_response_full($socket);
+        if ($ehlo['code'] !== 250) {
+            fputs($socket, "HELO {$clientHost}\r\n");
+            $ehlo = read_smtp_response_full($socket);
+        }
+
+        if (in_array($enc, ['tls', 'starttls']) || ($port === 587 && $enc !== 'ssl')) {
             fputs($socket, "STARTTLS\r\n");
-            $resp = fgets($socket, 512);
-            if (substr($resp, 0, 3) === '220') {
-                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT);
+            $tls = read_smtp_response_full($socket);
+            if ($tls['code'] === 220) {
+                @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
                 fputs($socket, "EHLO {$clientHost}\r\n");
-                while ($line = fgets($socket, 512)) {
-                    if (substr($line, 3, 1) === ' ') break;
-                }
+                $ehlo = read_smtp_response_full($socket);
             }
         }
 
         if (!empty($cfg['user']) && !empty($cfg['pass'])) {
+            $authenticated = false;
+            $authErrorMsg = '';
+
+            // Strategy 1: AUTH LOGIN
             fputs($socket, "AUTH LOGIN\r\n");
-            fgets($socket, 512);
-            fputs($socket, base64_encode($cfg['user']) . "\r\n");
-            fgets($socket, 512);
-            fputs($socket, base64_encode($cfg['pass']) . "\r\n");
-            $authRes = fgets($socket, 512);
-            if (substr($authRes, 0, 3) !== '235') {
+            $auth1 = read_smtp_response_full($socket);
+            if ($auth1['code'] === 334) {
+                fputs($socket, base64_encode($cfg['user']) . "\r\n");
+                $auth2 = read_smtp_response_full($socket);
+                if ($auth2['code'] === 334) {
+                    fputs($socket, base64_encode($cfg['pass']) . "\r\n");
+                    $auth3 = read_smtp_response_full($socket);
+                    if ($auth3['code'] === 235) {
+                        $authenticated = true;
+                    } else {
+                        $authErrorMsg = $auth3['last_line'];
+                    }
+                } else {
+                    $authErrorMsg = $auth2['last_line'];
+                }
+            } else {
+                $authErrorMsg = $auth1['last_line'];
+            }
+
+            // Strategy 2 Fallback: AUTH PLAIN
+            if (!$authenticated) {
+                $plainAuthStr = base64_encode("\0" . $cfg['user'] . "\0" . $cfg['pass']);
+                fputs($socket, "AUTH PLAIN {$plainAuthStr}\r\n");
+                $plainRes = read_smtp_response_full($socket);
+                if ($plainRes['code'] === 235) {
+                    $authenticated = true;
+                } else {
+                    if (empty($authErrorMsg)) {
+                        $authErrorMsg = $plainRes['last_line'];
+                    }
+                }
+            }
+
+            if (!$authenticated) {
                 fclose($socket);
-                error_log("SMTP Auth failed for user " . $cfg['user']);
-                log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP Authentication failed: " . trim($authRes));
+                error_log("SMTP Auth failed for user " . $cfg['user'] . ": " . $authErrorMsg);
+                log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP Authentication failed: " . $authErrorMsg);
                 return false;
             }
         }
 
         fputs($socket, "MAIL FROM:<{$fromEmail}>\r\n");
-        fgets($socket, 512);
+        read_smtp_response_full($socket);
         fputs($socket, "RCPT TO:<{$toEmail}>\r\n");
-        fgets($socket, 512);
+        read_smtp_response_full($socket);
         fputs($socket, "DATA\r\n");
-        fgets($socket, 512);
+        read_smtp_response_full($socket);
 
         $headersStr = "MIME-Version: 1.0\r\n" .
                       "Content-Type: text/html; charset=UTF-8\r\n" .
@@ -719,11 +881,12 @@ function send_app_email($toEmail, $subject, $htmlBody) {
                       "X-Mailer: xVault Security Mailer\r\n\r\n";
 
         fputs($socket, $headersStr . $htmlBody . "\r\n.\r\n");
-        fgets($socket, 512);
+        $sendRes = read_smtp_response_full($socket);
         fputs($socket, "QUIT\r\n");
         fclose($socket);
-        log_email_delivery($toEmail, $subject, 'transactional', 'sent');
-        return true;
+        $success = ($sendRes['code'] === 250);
+        log_email_delivery($toEmail, $subject, 'transactional', $success ? 'sent' : 'failed', $success ? null : $sendRes['last_line']);
+        return $success;
     } catch (\Throwable $e) {
         error_log("SMTP exception sending email to {$toEmail}: " . $e->getMessage());
         log_email_delivery($toEmail, $subject, 'transactional', 'failed', $e->getMessage());
