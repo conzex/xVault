@@ -185,8 +185,17 @@ class ConfigController {
      */
     public static function getUsers() {
         $db = getDB();
-        $stmt = $db->query("SELECT id, username, email, name, role, status, is_verified, created_at FROM users ORDER BY id ASC");
+        $stmt = $db->query("SELECT id, username, email, name, role, status, is_verified, email_verified_at, created_at FROM users ORDER BY id ASC");
         $users = $stmt->fetchAll();
+
+        foreach ($users as &$u) {
+            if ($u['role'] !== 'admin' && (empty($u['is_verified']) || empty($u['email_verified_at']) || $u['status'] === 'pending_verification')) {
+                $u['status'] = 'pending_verification';
+                $u['status_label'] = 'Pending Verification';
+            } else {
+                $u['status_label'] = ucfirst($u['status'] ?? 'active');
+            }
+        }
 
         json_response(['success' => true, 'users' => $users]);
     }

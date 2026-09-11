@@ -385,18 +385,31 @@ async function fetchSecurityDashboardData() {
         if (statsRes.ok) {
             const stats = await statsRes.json();
             const scoreEl = document.getElementById('sec-score-val');
+            const scoreMsgEl = document.getElementById('sec-score-msg');
+            const gaugeCircleEl = document.getElementById('sec-gauge-circle');
+            const totalEl = document.getElementById('sec-total-val');
+            const strongEl = document.getElementById('sec-strong-val');
             const weakEl = document.getElementById('sec-weak-val');
             const reusedEl = document.getElementById('sec-reused-val');
-            const totalEl = document.getElementById('sec-total-val');
+            const oldEl = document.getElementById('sec-old-val');
+            const attentionEl = document.getElementById('sec-attention-val');
             const updatedEl = document.getElementById('sec-last-updated');
 
             if (scoreEl) {
                 scoreEl.textContent = stats.has_data ? (stats.score + '%') : (stats.score_text || 'N/A');
                 scoreEl.style.fontSize = stats.has_data ? '36px' : '22px';
             }
+            if (scoreMsgEl) scoreMsgEl.textContent = stats.score_message || '';
+            if (gaugeCircleEl) {
+                const color = stats.has_data ? (stats.score >= 80 ? '#22C55E' : (stats.score >= 60 ? '#3B82F6' : '#EF4444')) : '#94A3B8';
+                gaugeCircleEl.style.borderColor = color;
+            }
+            if (totalEl) totalEl.textContent = stats.total_passwords;
+            if (strongEl) strongEl.textContent = stats.strong_passwords;
             if (weakEl) weakEl.textContent = stats.weak_passwords;
             if (reusedEl) reusedEl.textContent = stats.reused_passwords;
-            if (totalEl) totalEl.textContent = stats.total_passwords;
+            if (oldEl) oldEl.textContent = stats.old_passwords;
+            if (attentionEl) attentionEl.textContent = stats.attention_passwords;
             if (updatedEl) updatedEl.textContent = 'Updated at ' + stats.last_updated;
         }
 

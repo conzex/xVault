@@ -82,6 +82,7 @@ function initDatabaseSchema(PDO $pdo) {
                 name TEXT,
                 status TEXT DEFAULT 'active',
                 is_verified INTEGER DEFAULT 0,
+                email_verified_at TIMESTAMP,
                 verification_token TEXT,
                 verification_token_hash TEXT,
                 verification_token_expiry TIMESTAMP,
@@ -228,6 +229,10 @@ function run_db_migrations(PDO $pdo, $fromVersion) {
 
         try {
             $pdo->exec("ALTER TABLE users ADD COLUMN verification_token_expiry DATETIME NULL");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN email_verified_at DATETIME NULL");
         } catch (\Throwable $e) {}
 
         try {

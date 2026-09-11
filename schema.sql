@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255) NULL,
     status VARCHAR(50) DEFAULT 'active',
     is_verified TINYINT(1) DEFAULT 0,
+    email_verified_at DATETIME NULL,
     verification_token VARCHAR(255) NULL,
     verification_token_hash VARCHAR(255) NULL,
     verification_token_expiry DATETIME NULL,

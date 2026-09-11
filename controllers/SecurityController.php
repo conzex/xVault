@@ -34,23 +34,34 @@ class SecurityController {
         $db = getDB();
 
         // 1. Password Entries Audit
-        $stmt = $db->prepare('SELECT id, encrypted_password FROM password_entries WHERE user_id = ?');
+        $stmt = $db->prepare('SELECT id, encrypted_password, is_favorite, created_at FROM password_entries WHERE user_id = ?');
         $stmt->execute([$userId]);
         $passwords = $stmt->fetchAll();
 
         $totalPasswords = count($passwords);
         $weakCount = 0;
+        $strongCount = 0;
+        $oldCount = 0;
+        $favCount = 0;
+        $attentionCount = 0;
         $plainList = [];
+        $now = time();
+        $ninetyDaysAgo = $now - (90 * 86400);
 
         foreach ($passwords as $p) {
             $plain = decrypt_data($p['encrypted_password']);
             $plainList[] = $plain;
-            if (strlen($plain) < 10 || in_array(strtolower($plain), ['123456', 'password', 'admin', 'root', '12345678'])) {
-                $weakCount++;
+
+            if (!empty($p['is_favorite'])) {
+                $favCount++;
+            }
+
+            if (!empty($p['created_at']) && strtotime($p['created_at']) < $ninetyDaysAgo) {
+                $oldCount++;
             }
         }
 
-        // Detect reused passwords
+        // Count reused passwords across user entries
         $counts = array_count_values($plainList);
         $reusedCount = 0;
         foreach ($counts as $pText => $cnt) {
@@ -59,11 +70,36 @@ class SecurityController {
             }
         }
 
-        // Real Health Score calculation
+        // Evaluate complexity and attention items
+        $commonWeak = ['123456', 'password', 'admin', 'root', '12345678', 'qwerty', 'password123', 'welcome', '123456789'];
+        foreach ($passwords as $idx => $p) {
+            $plain = $plainList[$idx];
+            $isReused = ($counts[$plain] ?? 0) > 1;
+            $isWeak = (strlen($plain) < 10 || in_array(strtolower($plain), $commonWeak));
+            $isOld = (!empty($p['created_at']) && strtotime($p['created_at']) < $ninetyDaysAgo);
+
+            if ($isWeak) {
+                $weakCount++;
+            }
+
+            $hasUpper = preg_match('/[A-Z]/', $plain);
+            $hasLower = preg_match('/[a-z]/', $plain);
+            $hasDigit = preg_match('/[0-9]/', $plain);
+            $hasSymbol = preg_match('/[^A-Za-z0-9]/', $plain);
+
+            if (strlen($plain) >= 12 && $hasUpper && $hasLower && $hasDigit && $hasSymbol && !$isReused && !$isWeak) {
+                $strongCount++;
+            }
+
+            if ($isWeak || $isReused || $isOld) {
+                $attentionCount++;
+            }
+        }
+
+        // 2. Account & Failed Logins Context
         $userObj = current_user();
         $isUnverified = empty($userObj['is_verified']);
         
-        // 2. Failed logins in last 24h
         $failedStmt = $db->prepare("
             SELECT COUNT(*) as cnt FROM security_logs 
             WHERE (user_id = ? OR details LIKE ?) AND event_type = 'LOGIN_FAILED' AND created_at >= ?
@@ -78,27 +114,38 @@ class SecurityController {
                 'has_data' => false,
                 'score' => null,
                 'score_text' => 'Not available yet',
-                'score_message' => 'Add password entries to calculate your security posture.',
+                'score_message' => 'Not available yet — add password entries to calculate security score.',
                 'total_passwords' => 0,
+                'strong_passwords' => 0,
                 'weak_passwords' => 0,
                 'reused_passwords' => 0,
+                'old_passwords' => 0,
+                'attention_passwords' => 0,
+                'favorite_passwords' => 0,
                 'failed_logins_24h' => $failedCount,
                 'last_updated' => date('H:i:s')
             ]);
         }
 
-        $deductions = ($weakCount * 15) + ($reusedCount * 10) + ($failedCount * 5) + ($isUnverified ? 20 : 0);
-        $score = max(10, min(100, 100 - $deductions));
+        $weakRatio = $weakCount / $totalPasswords;
+        $reusedRatio = $reusedCount / $totalPasswords;
+        $oldRatio = $oldCount / $totalPasswords;
+        $deductions = ($weakRatio * 40) + ($reusedRatio * 30) + ($oldRatio * 15) + ($isUnverified ? 15 : 0) + min(15, $failedCount * 3);
+        $score = max(10, min(100, (int)round(100 - $deductions)));
 
         json_response([
             'success' => true,
             'has_data' => true,
             'score' => $score,
             'score_text' => $score . '%',
-            'score_message' => ($score >= 80 ? 'Strong vault security' : ($score >= 60 ? 'Fair security posture' : 'Action recommended')),
+            'score_message' => ($score >= 80 ? 'Strong vault security posture' : ($score >= 60 ? 'Fair security posture — improvements recommended' : 'Critical security vulnerabilities detected')),
             'total_passwords' => $totalPasswords,
+            'strong_passwords' => $strongCount,
             'weak_passwords' => $weakCount,
             'reused_passwords' => $reusedCount,
+            'old_passwords' => $oldCount,
+            'attention_passwords' => $attentionCount,
+            'favorite_passwords' => $favCount,
             'failed_logins_24h' => $failedCount,
             'last_updated' => date('H:i:s')
         ]);

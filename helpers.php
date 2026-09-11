@@ -237,6 +237,30 @@ function require_auth() {
             exit;
         }
     }
+
+    // Server-side verification & status enforcement
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('SELECT id, status, is_verified, role FROM users WHERE id = ?');
+        $stmt->execute([$user['id']]);
+        $dbUser = $stmt->fetch();
+
+        if (!$dbUser || ($dbUser['role'] !== 'admin' && (empty($dbUser['is_verified']) || $dbUser['status'] !== 'active'))) {
+            init_session();
+            $_SESSION = [];
+            session_destroy();
+
+            if (is_api_request()) {
+                json_response(['error' => 'Account is unverified or disabled. Please verify your email before logging in.', 'unverified' => true], 403);
+            } else {
+                header('Location: ' . APP_URL . '/login');
+                exit;
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log("require_auth DB check error: " . $e->getMessage());
+    }
+
     return $user;
 }
 
@@ -397,7 +421,7 @@ function get_smtp_config() {
     }
 
     $enabled = isset($dbSettings['smtp_enabled'])
-        ? filter_var($dbSettings['smtp_enabled'], FILTER_VALIDATE_BOOLEAN)
+        ? in_array(strtolower((string)$dbSettings['smtp_enabled']), ['1', 'true', 'yes', 'on'], true)
         : (defined('SMTP_ENABLED') ? filter_var(SMTP_ENABLED, FILTER_VALIDATE_BOOLEAN) : false);
 
     $host = $dbSettings['smtp_host'] ?? (defined('SMTP_HOST') ? SMTP_HOST : '');

@@ -138,9 +138,11 @@ class AuthController {
         $userCount = (int)$countStmt->fetch()['cnt'];
         $role = ($userCount === 0) ? 'admin' : 'user';
         $isVerified = ($role === 'admin') ? 1 : 0;
+        $status = ($role === 'admin') ? 'active' : 'pending_verification';
+        $emailVerifiedAt = ($role === 'admin') ? date('Y-m-d H:i:s') : null;
 
-        $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, is_verified, verification_token, verification_token_hash, verification_token_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-        $insert->execute([$email, $passwordHash, $role, $name, $isVerified, $rawToken, $tokenHash, $tokenExpiry]);
+        $insert = $db->prepare('INSERT INTO users (email, password_hash, role, name, status, is_verified, email_verified_at, verification_token, verification_token_hash, verification_token_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $insert->execute([$email, $passwordHash, $role, $name, $status, $isVerified, $emailVerifiedAt, $rawToken, $tokenHash, $tokenExpiry]);
         $userId = $db->lastInsertId();
 
         log_security_event('USER_REGISTERED', "New account created: {$email} ({$role})", $userId);
@@ -223,7 +225,7 @@ class AuthController {
                     $status = 'expired';
                     $message = 'Your email verification link has expired. Please request a new verification email below.';
                 } else {
-                    $update = $db->prepare('UPDATE users SET is_verified = 1, verification_token = NULL, verification_token_hash = NULL, verification_token_expiry = NULL WHERE id = ?');
+                    $update = $db->prepare("UPDATE users SET is_verified = 1, status = 'active', email_verified_at = CURRENT_TIMESTAMP, verification_token = NULL, verification_token_hash = NULL, verification_token_expiry = NULL WHERE id = ?");
                     $update->execute([$user['id']]);
 
                     log_security_event('EMAIL_VERIFIED', "Email verified for {$user['email']}", $user['id']);

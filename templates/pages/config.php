@@ -394,7 +394,7 @@ async function loadUsersAdmin() {
                 <td style="padding: 10px; color: #64748B;">${escapeHtml(u.email)}</td>
                 <td style="padding: 10px;"><span class="sidebar-badge">${escapeHtml(u.role)}</span></td>
                 <td style="padding: 10px;">
-                    <span class="sidebar-badge" style="background: ${u.status === 'active' ? '#D1FAE5; color:#065F46;' : '#FEE2E2; color:#991B1B;'}">${escapeHtml(u.status)}</span>
+                    <span class="sidebar-badge" style="background: ${u.status === 'active' ? '#D1FAE5; color:#065F46;' : (u.status === 'pending_verification' ? '#FEF9C3; color:#854D0E;' : '#FEE2E2; color:#991B1B;')}">${escapeHtml(u.status_label || (u.status === 'pending_verification' ? 'Pending Verification' : u.status))}</span>
                 </td>
                 <td style="padding: 10px; text-align: right;">
                     ${u.role === 'admin' ? '<span style="font-size: 11px; color:#94A3B8;">Root Admin</span>' : `
