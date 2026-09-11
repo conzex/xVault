@@ -211,12 +211,7 @@ class SecurityController {
             ];
 
             foreach ($settingsToSave as $k => $v) {
-                if (DB_DRIVER === 'sqlite') {
-                    $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
-                } else {
-                    $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
-                }
-                $stmt->execute([$k, $v]);
+                set_system_setting($k, $v);
             }
         } catch (\Throwable $e) {
             error_log("DB updateSMTP warning: " . $e->getMessage());

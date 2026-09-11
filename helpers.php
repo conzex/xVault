@@ -88,7 +88,8 @@ function get_system_setting($key, $default = null) {
 function set_system_setting($key, $value) {
     try {
         $db = getDB();
-        if (defined('DB_DRIVER') && DB_DRIVER === 'sqlite') {
+        $driver = strtolower((string)$db->getAttribute(PDO::ATTR_DRIVER_NAME));
+        if ($driver === 'sqlite') {
             $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
         } else {
             $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
@@ -424,13 +425,13 @@ function get_smtp_config() {
         ? in_array(strtolower((string)$dbSettings['smtp_enabled']), ['1', 'true', 'yes', 'on'], true)
         : (defined('SMTP_ENABLED') ? filter_var(SMTP_ENABLED, FILTER_VALIDATE_BOOLEAN) : false);
 
-    $host = $dbSettings['smtp_host'] ?? (defined('SMTP_HOST') ? SMTP_HOST : '');
-    $port = isset($dbSettings['smtp_port']) ? (int)$dbSettings['smtp_port'] : (defined('SMTP_PORT') ? (int)SMTP_PORT : 587);
-    $user = $dbSettings['smtp_user'] ?? (defined('SMTP_USER') ? SMTP_USER : '');
-    $pass = $dbSettings['smtp_pass'] ?? (defined('SMTP_PASS') ? SMTP_PASS : '');
-    $enc = $dbSettings['smtp_enc'] ?? $dbSettings['smtp_encryption'] ?? (defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : 'tls');
-    $fromEmail = $dbSettings['smtp_from_email'] ?? (defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : '');
-    $fromName = $dbSettings['smtp_from_name'] ?? (defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'xVault Security');
+    $host = !empty($dbSettings['smtp_host']) ? $dbSettings['smtp_host'] : (defined('SMTP_HOST') ? SMTP_HOST : '');
+    $port = !empty($dbSettings['smtp_port']) ? (int)$dbSettings['smtp_port'] : (defined('SMTP_PORT') ? (int)SMTP_PORT : 587);
+    $user = !empty($dbSettings['smtp_user']) ? $dbSettings['smtp_user'] : (defined('SMTP_USER') ? SMTP_USER : '');
+    $pass = !empty($dbSettings['smtp_pass']) ? $dbSettings['smtp_pass'] : (defined('SMTP_PASS') ? SMTP_PASS : '');
+    $enc = !empty($dbSettings['smtp_enc']) ? $dbSettings['smtp_enc'] : (!empty($dbSettings['smtp_encryption']) ? $dbSettings['smtp_encryption'] : (defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : 'tls'));
+    $fromEmail = !empty($dbSettings['smtp_from_email']) ? $dbSettings['smtp_from_email'] : (defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : '');
+    $fromName = !empty($dbSettings['smtp_from_name']) ? $dbSettings['smtp_from_name'] : (defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'xVault Security');
 
     return [
         'enabled' => $enabled,
@@ -441,6 +442,54 @@ function get_smtp_config() {
         'encryption' => $enc,
         'from_email' => $fromEmail,
         'from_name' => $fromName
+    ];
+}
+
+/**
+ * Smart SMTP Host Resolver with MX & Apex Domain Fallbacks
+ */
+function resolve_smtp_host($host) {
+    if (empty($host)) {
+        return ['host' => '', 'ip' => null, 'resolved' => false, 'note' => 'Host is empty'];
+    }
+
+    $resolvedIp = gethostbyname($host);
+    if ($resolvedIp !== $host || filter_var($host, FILTER_VALIDATE_IP)) {
+        return ['host' => $host, 'ip' => $resolvedIp, 'resolved' => true, 'note' => null];
+    }
+
+    // A-record lookup failed. Attempt MX record lookup on parent domain.
+    $domain = preg_replace('/^(mail|smtp)\./i', '', $host);
+    $mxHosts = [];
+    if (function_exists('getmxrr') && @getmxrr($domain, $mxHosts) && !empty($mxHosts[0])) {
+        $targetHost = $mxHosts[0];
+        $targetIp = gethostbyname($targetHost);
+        if ($targetIp !== $targetHost) {
+            return [
+                'host' => $targetHost,
+                'ip' => $targetIp,
+                'resolved' => true,
+                'note' => "Resolved '{$host}' via MX record for {$domain} to '{$targetHost}' ({$targetIp})"
+            ];
+        }
+    }
+
+    // Attempt Apex domain fallback
+    $apexIp = gethostbyname($domain);
+    if ($apexIp !== $domain) {
+        return [
+            'host' => $domain,
+            'ip' => $apexIp,
+            'resolved' => true,
+            'note' => "Resolved '{$host}' to apex domain '{$domain}' ({$apexIp})"
+        ];
+    }
+
+    return [
+        'host' => $host,
+        'ip' => null,
+        'resolved' => false,
+        'note' => "Unable to resolve DNS for '{$host}'."
     ];
 }
 
@@ -458,22 +507,33 @@ function test_smtp_connection($testEmail = null) {
         ];
     }
 
+    $dnsResult = resolve_smtp_host($cfg['host']);
+    if (!$dnsResult['resolved']) {
+        return [
+            'success' => false,
+            'status' => 'dns_failed',
+            'message' => "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'. Please verify your SMTP Host setting in Admin Panel > Configuration (e.g. mail.conzex.com, smtp.gmail.com, or your provider's SMTP server host)."
+        ];
+    }
+
+    $targetHost = $dnsResult['host'];
     $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
-    $host = $cfg['host'];
     $port = $cfg['port'];
 
-    $socket = @fsockopen($protocol . $host, $port, $errno, $errstr, 8);
+    $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
     if (!$socket) {
         $tip = "";
-        if ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
-            $tip = " (Connection timed out. Check if port {$port} is open and correct on your mail server. Standard SMTP ports are 587 for TLS/STARTTLS, 465 for SSL, or 25 for plain text.)";
+        if (strpos(strtolower($errstr), 'getaddrinfo') !== false) {
+            $tip = " (DNS lookup failed for '{$targetHost}'. Please check hostname spelling or DNS records.)";
+        } elseif ($errno === 110 || strpos(strtolower($errstr), 'timed out') !== false) {
+            $tip = " (Connection timed out to {$targetHost}:{$port}. Check if port {$port} is open and firewall is not blocking it. Standard SMTP ports: 587 for TLS, 465 for SSL, 25 for plain text.)";
         } elseif ($errno === 111 || strpos(strtolower($errstr), 'refused') !== false) {
-            $tip = " (Connection refused on port {$port}. Verify SMTP server status.)";
+            $tip = " (Connection refused on {$targetHost}:{$port}. Verify SMTP server status.)";
         }
         return [
             'success' => false,
             'status' => 'connection_failed',
-            'message' => "SMTP Connection failed to {$host}:{$port} - {$errstr} (code {$errno})" . $tip
+            'message' => "SMTP Connection failed to {$targetHost}:{$port} - {$errstr} (code {$errno})" . $tip
         ];
     }
     stream_set_timeout($socket, 8);
@@ -589,8 +649,15 @@ function send_app_email($toEmail, $subject, $htmlBody) {
 
     // TCP Socket SMTP Delivery
     try {
+        $dnsResult = resolve_smtp_host($cfg['host']);
+        if (!$dnsResult['resolved']) {
+            error_log("SMTP DNS resolution failed for host '{$cfg['host']}'");
+            log_email_delivery($toEmail, $subject, 'transactional', 'failed', "DNS Resolution Failed: Unable to resolve hostname '{$cfg['host']}'");
+            return false;
+        }
+
+        $targetHost = $dnsResult['host'];
         $protocol = (strtolower($cfg['encryption']) === 'ssl') ? 'ssl://' : '';
-        $targetHost = $cfg['host'];
         $port = (int)$cfg['port'];
 
         $socket = @fsockopen($protocol . $targetHost, $port, $errno, $errstr, 8);
@@ -599,6 +666,7 @@ function send_app_email($toEmail, $subject, $htmlBody) {
             log_email_delivery($toEmail, $subject, 'transactional', 'failed', "SMTP connection to {$targetHost}:{$port} failed - {$errstr}");
             return false;
         }
+        stream_set_timeout($socket, 8);
 
         fgets($socket, 512);
         $clientHost = gethostname() ?: 'localhost';

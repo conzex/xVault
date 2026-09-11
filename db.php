@@ -200,8 +200,7 @@ function check_database_health_and_version(PDO $pdo) {
         run_db_migrations($pdo, $installedVersion);
 
         if (version_compare($installedVersion, APP_DB_VERSION, '<')) {
-            $up = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('db_version', ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value");
-            $up->execute([APP_DB_VERSION]);
+            set_system_setting('db_version', APP_DB_VERSION);
         }
     } catch (\Throwable $e) {
         error_log("Database version check exception: " . $e->getMessage());
